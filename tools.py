@@ -136,21 +136,35 @@ def analyze_pdf_page(pdf_path: str, page_num: int, output_dir: str) -> str:
             if img_width < 50 or img_height < 50:
                 continue
 
-            # Save the image
-            save_name = f"p{page_num}_embedded_{img_idx}.{img_ext}"
-            save_path = os.path.join(assets_dir, save_name)
-            with open(save_path, "wb") as f:
-                f.write(img_data)
-
-            # Convert to PNG if not already
-            if img_ext.lower() not in ("png", "jpg", "jpeg"):
+            # Save the image — handle different formats
+            img_ext = img_ext.lower()
+            if img_ext in ("jpg", "jpeg", "png"):
+                # Common formats — save raw bytes directly (no resampling!)
+                save_name = f"p{page_num}_embedded_{img_idx}.{img_ext}"
+                save_path = os.path.join(assets_dir, save_name)
+                with open(save_path, "wb") as f:
+                    f.write(img_data)
+            else:
+                # Unusual formats (CMYK, JBIG2, TIFF, etc.) — use Pixmap fallback
+                save_name = f"p{page_num}_embedded_{img_idx}.png"
+                save_path = os.path.join(assets_dir, save_name)
                 try:
-                    pil = Image.open(save_path)
-                    save_name = f"p{page_num}_embedded_{img_idx}.png"
-                    save_path = os.path.join(assets_dir, save_name)
-                    pil.save(save_path, "PNG")
+                    pix = fitz.Pixmap(doc, xref)
+                    # CMYK: convert to RGB first
+                    if pix.n - pix.alpha >= 4:
+                        pix = fitz.Pixmap(fitz.csRGB, pix)
+                    pix.save(save_path)
                 except Exception:
-                    pass
+                    # Last resort: save raw and convert with PIL
+                    raw_path = os.path.join(assets_dir, f"p{page_num}_embedded_{img_idx}_raw.{img_ext}")
+                    with open(raw_path, "wb") as f:
+                        f.write(img_data)
+                    try:
+                        pil = Image.open(raw_path).convert("RGB")
+                        pil.save(save_path, "PNG")
+                        os.remove(raw_path)
+                    except Exception:
+                        save_path = raw_path
 
             # Get bounding box of the image on the page
             img_rects = page.get_image_rects(xref)
