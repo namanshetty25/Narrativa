@@ -101,16 +101,14 @@ def _base_html(title, font_family, heading_color, body_color, h1_size, h2_size, 
   .text h2 {{ font-size:{h2_size}px; margin:10px 0; color:{heading_color}; }}
   .text p {{ font-size:{body_size}px; line-height:1.5; margin:0 0 15px 0; color:{body_color}; hyphens:auto; }}
 
-  /* Image containers — works for both PNG and SVG via <img> tags */
-  .img-container {{ display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; overflow:hidden; }}
-  .img-container img {{ max-width:100%; max-height:100%; object-fit:contain; }}
-  .img-container.large img {{ width:100%; height:100%; object-fit:cover; }}
-  .img-container.medium img {{ max-width:85%; max-height:85%; }}
+  /* Image containers — fill available space, maintain aspect ratio */
+  .img-container {{ display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; overflow:hidden; width:100%; height:100%; }}
+  .img-container img {{ width:100%; height:100%; object-fit:contain; }}
   .img-full {{ position:absolute; top:0; left:0; width:100%; height:100%; z-index:-1; }}
   .img-full img {{ width:100%; height:100%; object-fit:cover; }}
   .overlay {{ position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; padding:60px; box-sizing:border-box; background:rgba(255,255,255,0.85); z-index:1; }}
-  .half {{ flex:0 0 50%; display:flex; align-items:center; justify-content:center; }}
-  .image-stack {{ display:flex; flex-direction:column; justify-content:center; gap:20px; padding:20px; box-sizing:border-box; }}
+  .half {{ flex:0 0 50%; display:flex; flex-direction:column; align-items:stretch; justify-content:stretch; overflow:hidden; }}
+  .image-stack {{ display:flex; flex-direction:column; justify-content:center; gap:20px; padding:20px; box-sizing:border-box; height:100%; }}
 
   /* Table styles */
   .table-container {{ width:100%; overflow-x:auto; margin:15px 0; }}
