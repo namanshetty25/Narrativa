@@ -52,6 +52,38 @@ def _safe_json(text: str, stage: str = "unknown"):
         raise ValueError(f"[{stage}] Invalid JSON: {e}")
 
 
+def _parse_json_safe(text: str, label: str, default=None):
+    """Robustly parse JSON from agent tool input strings.
+
+    Handles cases where the agent passes strings with unescaped backslashes,
+    invalid escape sequences, or other formatting issues.
+    """
+    if not text or not text.strip():
+        return default if default is not None else []
+
+    # If it's already a valid JSON string, parse it directly
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Fix common issue: unescaped backslashes (e.g. in Windows paths or HTML)
+    try:
+        fixed = text.replace("\\", "\\\\")
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+
+    # Try stripping markdown fences and extracting JSON
+    try:
+        return _safe_json(text, label)
+    except (ValueError, json.JSONDecodeError):
+        pass
+
+    print(f"  ⚠️ Could not parse {label} JSON, using default")
+    return default if default is not None else []
+
+
 # ================================================================
 # TOOL 1: Analyze PDF Page
 # ================================================================
@@ -482,9 +514,10 @@ def plan_slides(page_text: str, assets_json: str, tables_json: str, theme_json: 
         JSON string with array of slide plans. Each plan has title, content,
         layout, images (with indices), and styles.
     """
-    assets = json.loads(assets_json)
-    tables = json.loads(tables_json)
-    theme = json.loads(theme_json)
+    # Robust JSON parsing — agent may pass strings with unescaped chars
+    assets = _parse_json_safe(assets_json, "assets", default=[])
+    tables = _parse_json_safe(tables_json, "tables", default=[])
+    theme = _parse_json_safe(theme_json, "theme", default={})
 
     # Build asset info
     asset_infos = []
@@ -581,8 +614,8 @@ def render_slides(slide_plans_json: str, assets_json: str, slide_counter: int, o
     """
     from templates import render_slide
 
-    plans = json.loads(slide_plans_json)
-    assets = json.loads(assets_json)
+    plans = _parse_json_safe(slide_plans_json, "slide_plans", default=[])
+    assets = _parse_json_safe(assets_json, "assets", default=[])
     slides_dir = os.path.join(output_dir, "slides")
     os.makedirs(slides_dir, exist_ok=True)
 
