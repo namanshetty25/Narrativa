@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2 } from 'lucide-react';
+import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -25,6 +25,8 @@ export default function Home() {
     { role: 'ai', content: 'Welcome to **Narrativa**! Upload your documents using the sidebar, then ask me anything about them. I\'ll answer based strictly on your sources.' }
   ]);
   const [input, setInput] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [isUrlAdding, setIsUrlAdding] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +146,35 @@ export default function Home() {
     }
   };
 
+  const handleAddUrl = async () => {
+    if (!urlInput.trim() || isUrlAdding) return;
+    setIsUrlAdding(true);
+
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput }),
+      });
+      const data = await res.json();
+      if (data.success && data.source) {
+        setSources(prev => [...prev, data.source]);
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `🔗 **${data.source.name}** has been fetched and indexed. You can now ask questions about it!`
+        }]);
+        setUrlInput('');
+      } else {
+        alert(data.error || 'Failed to fetch URL');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error fetching URL');
+    } finally {
+      setIsUrlAdding(false);
+    }
+  };
+
   const handleDeleteSource = async (id: string) => {
     try {
       await fetch(`/api/sources/${id}`, { method: 'DELETE' });
@@ -198,17 +229,45 @@ export default function Home() {
           onChange={handleFileChange}
         />
 
-        <button
-          className={styles.uploadButton}
-          onClick={handleUploadClick}
-          disabled={isUploading}
-        >
-          {isUploading
-            ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-            : <Plus size={18} />
-          }
-          <span>{isUploading ? 'Uploading...' : 'Add Source'}</span>
-        </button>
+        <div className={styles.addSourceSection}>
+          <div className={styles.urlInputWrapper}>
+            <input 
+              type="url" 
+              className={styles.urlInput} 
+              placeholder="Paste Youtube or Web Link..."
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleAddUrl();
+              }}
+              disabled={isUrlAdding}
+            />
+            <button 
+              className={styles.urlAddButton}
+              onClick={handleAddUrl}
+              disabled={isUrlAdding || !urlInput.trim()}
+              title="Add Link"
+            >
+              {isUrlAdding ? <Loader2 size={16} className={styles.spin} /> : <LinkIcon size={16} />}
+            </button>
+          </div>
+          
+          <div className={styles.divider}>
+             <span>OR</span>
+          </div>
+
+          <button
+            className={styles.uploadButton}
+            onClick={handleUploadClick}
+            disabled={isUploading}
+          >
+            {isUploading
+              ? <Loader2 size={18} className={styles.spin} />
+              : <Plus size={18} />
+            }
+            <span>{isUploading ? 'Uploading...' : 'Upload Document'}</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Area: Chat */}
