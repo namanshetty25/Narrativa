@@ -90,7 +90,9 @@ def _parse_json_safe(text: str, label: str, default=None):
 
 @tool
 def analyze_pdf_page(pdf_path: str, page_num: int, output_dir: str) -> str:
-    """Analyze a single PDF page: extract text, render page image, get dimensions.
+    """Analyze a single PDF page: extract text, render page image, and extract embedded images.
+
+    Uses PyMuPDF to extract embedded raster images at original quality.
 
     Args:
         pdf_path: Path to the PDF file.
@@ -98,7 +100,8 @@ def analyze_pdf_page(pdf_path: str, page_num: int, output_dir: str) -> str:
         output_dir: Directory to save output assets.
 
     Returns:
-        JSON string with page_num, text, page_image_path, width, height.
+        JSON string with page_num, text, page_image_path, width, height,
+        and embedded_images (list of extracted images with paths and bboxes).
     """
     doc = fitz.open(pdf_path)
     page = doc[page_num - 1]
@@ -113,12 +116,74 @@ def analyze_pdf_page(pdf_path: str, page_num: int, output_dir: str) -> str:
     pix = page.get_pixmap(dpi=200)
     pix.save(img_path)
 
+    # Extract embedded images from PDF structure
+    embedded_images = []
+    image_list = page.get_images(full=True)
+
+    for img_idx, img_info in enumerate(image_list):
+        xref = img_info[0]
+        try:
+            base_image = doc.extract_image(xref)
+            if not base_image:
+                continue
+
+            img_data = base_image["image"]
+            img_ext = base_image.get("ext", "png")
+            img_width = base_image.get("width", 0)
+            img_height = base_image.get("height", 0)
+
+            # Skip tiny images (icons, bullets, decorations)
+            if img_width < 50 or img_height < 50:
+                continue
+
+            # Save the image
+            save_name = f"p{page_num}_embedded_{img_idx}.{img_ext}"
+            save_path = os.path.join(assets_dir, save_name)
+            with open(save_path, "wb") as f:
+                f.write(img_data)
+
+            # Convert to PNG if not already
+            if img_ext.lower() not in ("png", "jpg", "jpeg"):
+                try:
+                    pil = Image.open(save_path)
+                    save_name = f"p{page_num}_embedded_{img_idx}.png"
+                    save_path = os.path.join(assets_dir, save_name)
+                    pil.save(save_path, "PNG")
+                except Exception:
+                    pass
+
+            # Get bounding box of the image on the page
+            img_rects = page.get_image_rects(xref)
+            bbox = None
+            if img_rects:
+                r = img_rects[0]
+                # Normalize to 0-1000 scale
+                bbox = {
+                    "xmin": int(r.x0 / rect.width * 1000),
+                    "ymin": int(r.y0 / rect.height * 1000),
+                    "xmax": int(r.x1 / rect.width * 1000),
+                    "ymax": int(r.y1 / rect.height * 1000),
+                }
+
+            embedded_images.append({
+                "path": save_path,
+                "description": f"Embedded image {img_idx + 1} from page {page_num}",
+                "width": img_width,
+                "height": img_height,
+                "bbox": bbox,
+            })
+
+        except Exception as e:
+            print(f"  ⚠️ Could not extract image xref {xref}: {e}")
+            continue
+
     result = {
         "page_num": page_num,
         "text": text,
         "page_image_path": img_path,
         "width": rect.width,
         "height": rect.height,
+        "embedded_images": embedded_images,
     }
 
     doc.close()
