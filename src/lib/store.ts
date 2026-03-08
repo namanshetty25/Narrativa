@@ -19,7 +19,13 @@ type StoreData = {
   chunks: DocumentChunk[];
 };
 
-const DATA_FILE = path.join(process.cwd(), '.data.json');
+const DATA_DIR = path.join(process.cwd(), '.data');
+const DATA_FILE = path.join(DATA_DIR, 'store.json');
+
+// Ensure directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 export function loadStore(): StoreData {
   try {
@@ -41,11 +47,18 @@ export function saveStore(data: StoreData) {
   }
 }
 
-export function addSourceAndChunks(source: Source) {
+export function deleteSourceAndChunks(id: string) {
+  const store = loadStore();
+  store.sources = store.sources.filter(s => s.id !== id);
+  store.chunks = store.chunks.filter(c => c.sourceId !== id);
+  saveStore(store);
+}
+
+export function addSourceAndChunks(source: Source): { source: Source; chunks: DocumentChunk[] } {
   const store = loadStore();
   store.sources.push(source);
   
-  // Basic semantic chunking (split by double newline or fallback to chunks of 1000 chars)
+  // Basic semantic chunking
   const paragraphs = source.text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
   
   let currentChunk = '';
@@ -76,5 +89,5 @@ export function addSourceAndChunks(source: Source) {
   store.chunks.push(...chunks);
   saveStore(store);
   
-  return source;
+  return { source, chunks };
 }

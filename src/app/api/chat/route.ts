@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     let contextText = '';
 
     if (store.chunks.length > 0) {
-      const retrievedChunks = retrieveRelevantChunks(query, 8);
+      const retrievedChunks = await retrieveRelevantChunks(query, 8);
       if (retrievedChunks.length > 0) {
         contextText = retrievedChunks.map((c, i) => `[Excerpt ${i + 1}]\n${c.text}`).join('\n\n---\n\n');
       } else {

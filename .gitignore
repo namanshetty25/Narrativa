@@ -25,6 +25,7 @@
 *.pem
 
 # app runtime data
+.data/
 .data.json
 test-source.md
 
