@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { addSourceAndChunks } from '@/lib/store';
+import { addSourceAndChunks, loadStore, saveStore } from '@/lib/store';
+import { generateEmbeddings } from '@/lib/embeddings';
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,12 +55,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 400 });
     }
 
-    const source = addSourceAndChunks({
+    // Add source and create chunks
+    const { source, chunks } = addSourceAndChunks({
       id: crypto.randomUUID(),
       name: file.name,
       type: file.name.endsWith('.pdf') ? 'pdf' : 'txt',
       text: text,
     });
+
+    // Generate embeddings for all chunks and persist them
+    try {
+      const chunkTexts = chunks.map((c: { text: string }) => c.text);
+      const embeddings = await generateEmbeddings(chunkTexts);
+
+      // Add embeddings directly to the fast local FAISS database
+      const { addVectors } = await import('@/lib/vector-store');
+      const chunkIds = chunks.map((c: { id: string }) => c.id);
+      addVectors(embeddings, chunkIds);
+
+      console.log(`✅ Generated embeddings for ${embeddings.length} chunks and stored in FAISS`);
+    } catch (embeddingError) {
+      console.error('Failed to generate embeddings (chunks stored without embeddings):', embeddingError);
+    }
 
     return NextResponse.json({ success: true, source: { id: source.id, name: source.name, type: source.type } });
   } catch (error: any) {

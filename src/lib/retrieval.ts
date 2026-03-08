@@ -1,38 +1,37 @@
 import { loadStore } from './store';
+import { generateEmbedding } from './embeddings';
+import { searchVector, initVectorStore } from './vector-store';
 
-// Basic Lexical (Keyword) Retrieval implementation for simplicity
-// In a production NotebookLM clone, this would be replaced by vector embeddings (e.g., Gemini text-embedding-004)
-export function retrieveRelevantChunks(query: string, topK: number = 5) {
+/**
+ * Retrieve the most relevant document chunks for a query using FAISS vector similarity.
+ */
+export async function retrieveRelevantChunks(query: string, topK: number = 5) {
+  initVectorStore();
   const store = loadStore();
   if (store.chunks.length === 0) return [];
 
-  const queryWords = query.toLowerCase().split(/\W+/).filter(w => w.length > 2);
-  if (queryWords.length === 0) {
-    // Return first few chunks if we have no meaningful keywords
-    return store.chunks.slice(0, topK);
-  }
+  try {
+    // Generate embedding for the user query
+    const queryEmbedding = await generateEmbedding(query);
 
-  const scoredChunks = store.chunks.map(chunk => {
-    let score = 0;
-    const chunkText = chunk.text.toLowerCase();
-    
-    // simple term frequency
-    for (const word of queryWords) {
-        const regex = new RegExp(`\\b${word}\\b`, 'gi');
-        const matches = chunkText.match(regex);
-        if (matches) {
-            score += matches.length;
-        }
+    // Call FAISS C++ bindings to quickly find topK vector indices and map to UUIDs
+    const matchingIds = searchVector(queryEmbedding, topK);
+
+    if (matchingIds.length === 0) {
+       console.warn('FAISS returned no matches. Falling back to first chunks.');
+       return store.chunks.slice(0, topK).map(c => ({ text: c.text, sourceId: c.sourceId }));
     }
-    
-    return { ...chunk, score };
-  });
 
-  // Sort by score descending and return
-  scoredChunks.sort((a, b) => b.score - a.score);
-  
-  return scoredChunks
-    .filter(chunk => chunk.score > 0)
-    .slice(0, topK)
-    .map(c => ({ text: c.text, sourceId: c.sourceId }));
+    // Lookup metadata from local disk FSS metadata by ID matches
+    const relevantChunks = matchingIds
+      .map(id => store.chunks.find(c => c.id === id))
+      .filter(chunk => chunk !== undefined)
+      .map(chunk => ({ text: chunk!.text, sourceId: chunk!.sourceId }));
+
+    return relevantChunks;
+
+  } catch (err) {
+    console.error("Retrieval failed, returning fallback", err);
+    return store.chunks.slice(0, topK).map(c => ({ text: c.text, sourceId: c.sourceId }));
+  }
 }
