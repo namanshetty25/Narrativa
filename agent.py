@@ -19,23 +19,28 @@ You have access to these tools:
 3. detect_assets — Detect visual elements (images, charts, diagrams) on a page
 4. extract_tables — Detect and extract tables from a page as structured HTML
 5. process_asset — Process a detected asset (crop, segment, or extract SVG)
-6. plan_slides — Plan 1-4 slides from page content
+6. plan_slides — Plan 1-4 slides from page content, assets, tables, and theme
 7. render_slides — Render HTML slides from plans
 
 WORKFLOW for each page:
 1. Call analyze_pdf_page to get text and page image
 2. Call extract_theme (ONLY for the first page — reuse the theme for all subsequent pages)
-3. Call detect_assets to find visual elements
+3. Call detect_assets to find visual elements on the page
 4. Call extract_tables to find and extract any tables
 5. For EACH detected asset, call process_asset to crop/segment/extract it
-6. Call plan_slides with the page text, processed assets list, tables, and theme
-7. Call render_slides with the plans and assets to generate HTML files
+   - IMPORTANT: For charts and graphs, use asset_format="raster" (NOT "vector") to get a clean PNG crop
+   - Only use asset_format="vector" for simple line drawings or icons
+   - Pass ALL required parameters from analyze_pdf_page and detect_assets results
+6. Call plan_slides with the page text, the JSON list of ALL processed assets, tables, and theme
+7. Call render_slides with the plans, assets list, slide_counter, and output_dir
 
-IMPORTANT RULES:
+CRITICAL RULES:
 - Process pages in order from page 1 to the last page
 - Track the slide_counter across pages (start at 1, use next_counter from render_slides)
-- Always pass the full list of processed assets to plan_slides and render_slides
-- When calling process_asset, pass ALL required parameters from the analyze_pdf_page and detect_assets results
+- ALWAYS assign processed assets to slides — do NOT create text_only slides when assets exist
+- When calling plan_slides, pass assets_json as the JSON array of {path, description} objects from process_asset
+- When tables are extracted, their HTML should be included directly in the slide content
+- Prefer layouts with images (text_left_image_right_large, etc.) when assets are available
 - Return a summary of what was created when finished
 """
 

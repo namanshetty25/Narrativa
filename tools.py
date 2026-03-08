@@ -226,11 +226,13 @@ For each detected element, provide:
 - Bounding box in normalized coordinates (0-1000): xmin, ymin, xmax, ymax
 - label: short precise description
 - type: "rectangular" (clean rectangular shape) or "complex" (irregular shape)
-- format: "raster" (pixel-based) or "vector" (sharp lines like charts/diagrams)
+- format: "raster" for ALL charts, graphs, photos, screenshots, and data visualizations.
+  Only use "vector" for very simple line art, icons, or geometric shapes.
 
 Rules:
-- Charts/graphs: classify as "vector" if sharp-lined
-- Ignore pure text blocks, small icons, decorative lines, or borders
+- Charts/graphs/bar charts/pie charts: ALWAYS classify as format "raster" and type "rectangular"
+- Make bounding boxes TIGHT around each individual element — do NOT include surrounding text
+- Ignore pure text blocks, small decorative elements, page borders, or headers/footers
 
 Return ONLY valid JSON:
 {
@@ -542,32 +544,40 @@ Task:
 - Preserve all important text verbatim (do not summarize or paraphrase)
 - IMPORTANT: Do NOT include the slide title in the "content" array — title is handled separately
 - Structure content flexibly: Use "# Heading" for h1, "## Subheading" for h2, plain strings for paragraphs
-- If tables were extracted, include them in the relevant slide's content as HTML
-- Use paragraphs for narrative sections; only use bullets if the original text is list-like
+- Use paragraphs for narrative sections; use bullet points (starting with "- ") if the text is list-like
 - Assign 0-2 most relevant assets to each slide
-- Choose the most suitable layout based on content and assets
 
-Available layouts:
-- text_only: Full text, no assets
-- full_image: Full slide asset with overlay text
-- text_left_image_right_large: 50% left text, 50% right asset (fills height)
+CRITICAL IMAGE RULES:
+- If assets are available, you MUST assign at least one asset to each slide
+- Do NOT use "text_only" layout when assets are available — use a layout with images
+- Use image_index (1-based) to reference assets from the available assets list
+- Charts, graphs, and financial data should ALWAYS be paired with their corresponding text
+
+TABLE RULES:
+- If tables were extracted, include the raw HTML <table> directly in the "content" array
+- Tables render with professional styling automatically
+
+Available layouts (PREFER layouts with images when assets exist):
+- text_left_image_right_large: 50% left text, 50% right asset (fills height) — BEST for charts/graphs
 - text_right_image_left_large: Mirror of above
 - text_left_image_right_medium: 50% left text, 50% right asset (medium size)
 - text_right_image_left_medium: Mirror of above
 - text_left_two_images_right: Text left (50%), two assets stacked right (50%)
 - text_right_two_images_left: Mirror of above
+- full_image: Full slide asset with overlay text — good for title slides
+- text_only: Full text, no assets — ONLY use when no assets are available
 
 Return ONLY a valid JSON array:
 [
   {{
     "title": "Slide title (DO NOT repeat in content)",
     "content": ["# Heading", "Paragraph text.", "## Sub Heading", "More text."],
-    "layout": "layout_name",
+    "layout": "text_left_image_right_large",
     "images": [
       {{
         "image_index": 1,
-        "size": "full | large | medium",
-        "position": "left | right | center"
+        "size": "large",
+        "position": "right"
       }}
     ],
     "styles": {{}}
