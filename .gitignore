@@ -27,6 +27,7 @@
 # app runtime data
 .data/
 .data.json
+.audio/
 test-source.md
 
 # debug
