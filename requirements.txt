@@ -1,0 +1,16 @@
+# Core
+langchain>=0.3.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+python-dotenv>=1.0.0
+
+# PDF Processing
+PyMuPDF>=1.24.0
+
+# Image Processing
+Pillow>=10.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+
+# Optional: SAM3 segmentation (GPU required)
+# torch>=2.0.0
