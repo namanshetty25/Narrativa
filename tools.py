@@ -225,14 +225,12 @@ diagrams, logos, icons, etc.
 For each detected element, provide:
 - Bounding box in normalized coordinates (0-1000): xmin, ymin, xmax, ymax
 - label: short precise description
-- type: "rectangular" (clean rectangular shape) or "complex" (irregular shape)
-- format: "raster" for ALL charts, graphs, photos, screenshots, and data visualizations.
-  Only use "vector" for very simple line art, icons, or geometric shapes.
+- type: "rectangular" (clean rectangular shape) or "complex" (irregular shape needing segmentation)
 
 Rules:
-- Charts/graphs/bar charts/pie charts: ALWAYS classify as format "raster" and type "rectangular"
 - Make bounding boxes TIGHT around each individual element — do NOT include surrounding text
 - Ignore pure text blocks, small decorative elements, page borders, or headers/footers
+- Each chart/graph/diagram should be detected as a SEPARATE element
 
 Return ONLY valid JSON:
 {
@@ -240,8 +238,7 @@ Return ONLY valid JSON:
     {
       "xmin": 100, "ymin": 200, "xmax": 500, "ymax": 600,
       "label": "description",
-      "type": "rectangular",
-      "format": "raster"
+      "type": "rectangular"
     }
   ]
 }"""
@@ -332,37 +329,29 @@ If NO tables are found, return: {"tables": []}"""
 @tool
 def process_asset(
     page_image_path: str,
-    pdf_path: str,
     page_num: int,
-    page_width: float,
-    page_height: float,
     xmin: float,
     ymin: float,
     xmax: float,
     ymax: float,
     label: str,
     asset_type: str,
-    asset_format: str,
     output_dir: str,
     asset_index: int,
 ) -> str:
-    """Process a single detected asset: crop, segment with SAM3, or extract as SVG.
+    """Process a single detected asset: crop from the page image as a clean PNG.
 
-    Uses Gemini Vision to verify if SAM3 segmentation is truly needed for complex types.
+    Uses Gemini Vision to verify if SAM3 segmentation is needed for complex types.
 
     Args:
         page_image_path: Path to the full page image.
-        pdf_path: Path to the source PDF.
         page_num: Page number (1-indexed).
-        page_width: PDF page width in points.
-        page_height: PDF page height in points.
         xmin: Left coordinate (0-1000 normalized).
         ymin: Top coordinate (0-1000 normalized).
         xmax: Right coordinate (0-1000 normalized).
         ymax: Bottom coordinate (0-1000 normalized).
         label: Description of the asset.
         asset_type: "rectangular" or "complex".
-        asset_format: "raster" or "vector".
         output_dir: Output directory for saved assets.
         asset_index: Index number for the output filename.
 
@@ -375,38 +364,9 @@ def process_asset(
     pil_img = Image.open(page_image_path)
     img_w, img_h = pil_img.size
 
-    # ---- Vector: Extract SVG from PDF structure ----
-    if asset_format == "vector":
-        svg_path = os.path.join(assets_dir, f"p{page_num}_asset_{asset_index}.svg")
-        scale_x = page_width / img_w
-        scale_y = page_height / img_h
-
-        clip_rect = fitz.Rect(
-            (xmin / 1000) * img_w * scale_x,
-            (ymin / 1000) * img_h * scale_y,
-            (xmax / 1000) * img_w * scale_x,
-            (ymax / 1000) * img_h * scale_y,
-        )
-
-        doc = fitz.open(pdf_path)
-        page = doc[page_num - 1]
-        temp_doc = fitz.open()
-        new_page = temp_doc.new_page(width=clip_rect.width, height=clip_rect.height)
-        new_page.show_pdf_page(new_page.rect, doc, page_num - 1, clip=clip_rect)
-        svg = new_page.get_svg_image(text_as_path=True)
-
-        with open(svg_path, "w", encoding="utf-8") as f:
-            f.write(svg)
-
-        temp_doc.close()
-        doc.close()
-
-        return json.dumps({"path": svg_path, "description": label})
-
-    # ---- Raster: Crop or Segment ----
     png_path = os.path.join(assets_dir, f"p{page_num}_asset_{asset_index}.png")
 
-    # Simple rectangular crop
+    # Crop the bounding box region
     left = int(xmin / 1000 * img_w)
     top = int(ymin / 1000 * img_h)
     right = int(xmax / 1000 * img_w)
@@ -424,7 +384,7 @@ def process_asset(
                 if seg_result:
                     return json.dumps({"path": seg_result, "description": label})
 
-    # Default: save the crop
+    # Save the crop
     cropped.save(png_path, "PNG")
     return json.dumps({"path": png_path, "description": label})
 
