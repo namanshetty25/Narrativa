@@ -1,36 +1,112 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Narrativa
 
-## Getting Started
+An AI-powered educational platform with two core features:
 
-First, run the development server:
+1. **📝 NotebookLM Clone** — Document upload, AI chat, and study tools (Next.js web app)
+2. **🎨 Slide Generator** — PDF-to-slides AI pipeline using LangChain + Gemini (Python CLI)
+
+---
+
+## 🚀 Quick Start
+
+### NotebookLM Web App
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Upload PDFs and chat with AI about your documents.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Slide Generator
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
 
-## Learn More
+# Set up API key
+cp .env.example .env
+# Edit .env and add your GOOGLE_API_KEY
 
-To learn more about Next.js, take a look at the following resources:
+# Run the pipeline
+python main.py --pdf input.pdf --output my_slides
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📁 Project Structure
 
-## Deploy on Vercel
+```
+Narrativa/
+├── src/                    # Next.js web app (NotebookLM clone)
+│   ├── app/                # Pages and API routes
+│   └── ...
+├── public/                 # Static assets
+├── scripts/                # Python utility scripts (TTS, YouTube)
+│
+├── agent.py                # LangGraph React agent (slide pipeline)
+├── tools.py                # 6 LangChain tools (@tool decorated)
+├── templates.py            # HTML slide renderer (8 layouts)
+├── config.py               # API keys, model config, optional SAM3
+├── main.py                 # CLI entry point
+│
+├── package.json            # Node.js dependencies
+├── requirements.txt        # Python dependencies
+└── .env.example            # API key template
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🎨 Slide Generator
+
+### Features
+- **6 LangChain Tools**: analyze_pdf_page, detect_assets, extract_tables, process_asset, plan_slides, render_slides
+- **Hybrid Image Extraction**: PyMuPDF for embedded images (original quality) + Gemini Vision crop for charts/diagrams
+- **8 Slide Layouts**: text-only, full-image, text+image (left/right), two-image variants
+- **Education Theme**: Navy blue/gray professional design with Inter font
+- **Smart Table Extraction**: Tables rendered with zebra striping and styled headers
+- **Optional SAM3**: GPU-accelerated segmentation for complex assets
+
+### CLI Options
+
+```bash
+python main.py --pdf <file.pdf> --output <dir> [--pages 1-5]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--pdf` | Input PDF file path |
+| `--output` | Output directory for slides |
+| `--pages` | Optional page range (e.g., `1-5`) |
+
+---
+
+## 🛠 Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Web Frontend | Next.js, TypeScript, React |
+| Slide Pipeline | LangChain, LangGraph, Python |
+| AI Models | Google Gemini 2.5 Flash & Pro |
+| PDF Processing | PyMuPDF (fitz) |
+| Image Processing | Pillow, NumPy |
+| Segmentation | SAM3 (optional, GPU) |
+
+---
+
+## 📋 Environment Variables
+
+Create a `.env` file from the template:
+
+```bash
+cp .env.example .env
+```
+
+Required:
+- `GOOGLE_API_KEY` — Your Google Generative AI API key
+
+---
+
+## 📄 License
+
+MIT
