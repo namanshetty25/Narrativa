@@ -205,75 +205,21 @@ def analyze_pdf_page(pdf_path: str, page_num: int, output_dir: str) -> str:
 
 
 # ================================================================
-# TOOL 2: Extract Theme
+# DEFAULT EDUCATION THEME
 # ================================================================
 
-@tool
-def extract_theme(pdf_path: str, page_num: int) -> str:
-    """Extract design theme (fonts, colors, sizes) from a PDF page for slide styling.
-
-    Args:
-        pdf_path: Path to the PDF file.
-        page_num: Page number (1-indexed) to extract theme from.
-
-    Returns:
-        JSON string with font_family, heading_color, body_color, h1_size, h2_size, body_size.
-    """
-    doc = fitz.open(pdf_path)
-    page = doc[page_num - 1]
-    text_dict = page.get_text("dict")
-
-    # Collect span info
-    spans = []
-    for block in text_dict["blocks"]:
-        if "lines" in block:
-            for line in block["lines"]:
-                for span in line["spans"]:
-                    color_int = span["color"]
-                    r = (color_int >> 16) & 0xFF
-                    g = (color_int >> 8) & 0xFF
-                    b = color_int & 0xFF
-                    spans.append({
-                        "font": span["font"],
-                        "size": round(span["size"], 1),
-                        "color": f"#{r:02x}{g:02x}{b:02x}",
-                        "text": span["text"].strip()[:50],
-                    })
-
-    unique_fonts = list(set(s["font"] for s in spans))
-    unique_sizes = sorted(list(set(s["size"] for s in spans)), reverse=True)
-    unique_colors = list(set(s["color"] for s in spans))
-    doc.close()
-
-    prompt = f"""Analyze this PDF page's text styles to extract a consistent theme for HTML slides.
-
-Extracted data:
-- Fonts: {unique_fonts}
-- Sizes (sorted descending): {unique_sizes}
-- Colors: {unique_colors}
-- Sample spans: {json.dumps(spans[:10])}
-
-Task:
-- Map to web-safe font family (e.g., 'serif' for Times-like, 'sans-serif' for Arial-like)
-- Choose primary heading color and body color (hex)
-- Define size hierarchy: h1 (largest), h2 (next), body (smallest common)
-- Scale down sizes 20-30% from original for better slide fit
-- Ensure sizes fit 1920x1080 slide (h1 ~50-70px, body ~25-35px)
-
-Return ONLY valid JSON:
-{{
-  "font_family": "sans-serif",
-  "heading_color": "#000000",
-  "body_color": "#333333",
-  "h1_size": 60,
-  "h2_size": 40,
-  "body_size": 32
-}}"""
-
-    model = get_pro_model()
-    response = model.invoke([HumanMessage(content=prompt)])
-    theme = _safe_json(response.content, "Theme Extraction")
-    return json.dumps(theme)
+DEFAULT_THEME = {
+    "font_family": "'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif",
+    "heading_color": "#1a365d",     # Deep navy blue
+    "body_color": "#4a5568",        # Warm dark gray
+    "accent_color": "#2b6cb0",      # Bright blue for accents
+    "bg_color": "#f7fafc",          # Light cool gray background
+    "banner_bg": "#1a365d",         # Navy banner
+    "banner_text": "#ffffff",       # White text on banner
+    "h1_size": 56,
+    "h2_size": 40,
+    "body_size": 28,
+}
 
 
 # ================================================================
@@ -540,16 +486,16 @@ def _segment_with_sam3(pil_img, description, xmin, ymin, xmax, ymax, output_path
 # ================================================================
 
 @tool
-def plan_slides(page_text: str, assets_json: str, tables_json: str, theme_json: str) -> str:
-    """Plan 1-4 presentation slides from page content, assets, tables, and theme.
+def plan_slides(page_text: str, assets_json: str, tables_json: str) -> str:
+    """Plan 1-4 presentation slides from page content, assets, and tables.
 
-    Uses Gemini Pro with multimodal input to create an optimal slide layout plan.
+    Uses Gemini Pro to create an optimal slide layout plan.
+    Theme is applied automatically from the default education theme.
 
     Args:
         page_text: Extracted text from the PDF page.
         assets_json: JSON string of processed assets (list of {path, description}).
         tables_json: JSON string of extracted tables (list of {html, description}).
-        theme_json: JSON string of the design theme.
 
     Returns:
         JSON string with array of slide plans. Each plan has title, content,
@@ -558,7 +504,7 @@ def plan_slides(page_text: str, assets_json: str, tables_json: str, theme_json: 
     # Robust JSON parsing — agent may pass strings with unescaped chars
     assets = _parse_json_safe(assets_json, "assets", default=[])
     tables = _parse_json_safe(tables_json, "tables", default=[])
-    theme = _parse_json_safe(theme_json, "theme", default={})
+    theme = DEFAULT_THEME
 
     # Build asset info
     asset_infos = []
@@ -572,10 +518,9 @@ def plan_slides(page_text: str, assets_json: str, tables_json: str, theme_json: 
         table_infos.append(f"Table {idx+1}: {tbl.get('description', 'Unnamed table')}")
     table_str = "\n".join(table_infos) if table_infos else "No tables found."
 
-    prompt = f"""You are a world-class presentation designer converting textbook pages into beautiful, clear slides.
+    prompt = f"""You are a world-class presentation designer converting textbook/educational pages into beautiful, clear slides.
 
-Use this theme to match the original PDF style:
-{json.dumps(theme)}
+You are designing for an education-themed presentation with a clean, professional look.
 
 Task:
 - Analyze the page text, available assets, and extracted tables
@@ -701,7 +646,6 @@ def render_slides(slide_plans_json: str, assets_json: str, slide_counter: int, o
 
 ALL_TOOLS = [
     analyze_pdf_page,
-    extract_theme,
     detect_assets,
     extract_tables,
     process_asset,

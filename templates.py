@@ -85,38 +85,46 @@ def _render_content(content, title, h1_size, h2_size, body_size, heading_color, 
 
 def _base_html(title, font_family, heading_color, body_color, h1_size, h2_size, body_size, title_html) -> str:
     """Generate the HTML head + opening body tags with CSS."""
+    # Pull education theme colors from styles (merged in plan_slides)
+    bg_color = "#f7fafc"
+    banner_bg = "#1a365d"
+    banner_text = "#ffffff"
+    accent_color = "#2b6cb0"
+
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <title>{title}</title>
 <style>
-  body {{ margin:0; padding:0; overflow:hidden; font-family: {font_family}; background:#ffffff; }}
-  .slide {{ width:1920px; height:1080px; display:flex; flex-direction:column; position:relative; align-items:stretch; }}
-  .title-banner {{ flex-shrink:0; border-bottom:2px solid #e0e0e0; width:100%; background:#fafafa; }}
+  body {{ margin:0; padding:0; overflow:hidden; font-family: 'Inter', {font_family}; background:{bg_color}; }}
+  .slide {{ width:1920px; height:1080px; display:flex; flex-direction:column; position:relative; align-items:stretch; background:{bg_color}; }}
+  .title-banner {{ flex-shrink:0; width:100%; background:{banner_bg}; border-bottom:4px solid {accent_color}; }}
+  .title-banner h1 {{ color:{banner_text} !important; }}
   .content-area {{ flex:1; display:flex; flex-direction:row; overflow:hidden; }}
   .text {{ padding:40px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:flex-start; overflow-y:auto; flex:1; }}
-  .text h1 {{ font-size:{h1_size}px; margin:0 0 20px 0; color:{heading_color}; }}
-  .text h2 {{ font-size:{h2_size}px; margin:10px 0; color:{heading_color}; }}
-  .text p {{ font-size:{body_size}px; line-height:1.5; margin:0 0 15px 0; color:{body_color}; hyphens:auto; }}
+  .text h1 {{ font-size:{h1_size}px; margin:0 0 20px 0; color:{heading_color}; font-weight:700; }}
+  .text h2 {{ font-size:{h2_size}px; margin:10px 0; color:{heading_color}; font-weight:600; }}
+  .text p {{ font-size:{body_size}px; line-height:1.6; margin:0 0 15px 0; color:{body_color}; }}
 
   /* Image containers — fill available space, maintain aspect ratio */
   .img-container {{ display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; overflow:hidden; width:100%; height:100%; }}
   .img-container img {{ width:100%; height:100%; object-fit:contain; }}
   .img-full {{ position:absolute; top:0; left:0; width:100%; height:100%; z-index:-1; }}
   .img-full img {{ width:100%; height:100%; object-fit:cover; }}
-  .overlay {{ position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; padding:60px; box-sizing:border-box; background:rgba(255,255,255,0.85); z-index:1; }}
+  .overlay {{ position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; justify-content:center; padding:60px; box-sizing:border-box; background:rgba(247,250,252,0.9); z-index:1; }}
   .half {{ flex:0 0 50%; display:flex; flex-direction:column; align-items:stretch; justify-content:stretch; overflow:hidden; }}
   .image-stack {{ display:flex; flex-direction:column; justify-content:center; gap:20px; padding:20px; box-sizing:border-box; height:100%; }}
 
-  /* Table styles */
-  .table-container {{ width:100%; overflow-x:auto; margin:15px 0; }}
-  .table-container table {{ width:100%; border-collapse:collapse; font-size:{int(body_size * 0.7)}px; }}
-  .table-container th {{ background:{heading_color}; color:#ffffff; padding:12px 16px; text-align:left; font-weight:600; border:1px solid #ddd; }}
-  .table-container td {{ padding:10px 16px; border:1px solid #ddd; color:{body_color}; }}
-  .table-container tr:nth-child(even) {{ background:#f8f9fa; }}
-  .table-container tr:hover {{ background:#e8f4f8; }}
+  /* Table styles — education blue theme */
+  .table-container {{ width:100%; overflow-x:auto; margin:15px 0; border-radius:8px; }}
+  .table-container table {{ width:100%; border-collapse:collapse; font-size:{int(body_size * 0.75)}px; }}
+  .table-container th {{ background:{banner_bg}; color:#ffffff; padding:12px 16px; text-align:left; font-weight:600; border:1px solid {accent_color}; }}
+  .table-container td {{ padding:10px 16px; border:1px solid #e2e8f0; color:{body_color}; }}
+  .table-container tr:nth-child(even) {{ background:#edf2f7; }}
+  .table-container tr:hover {{ background:#e2e8f0; }}
 
   /* Scrollbar hiding */
   .text::-webkit-scrollbar {{ display: none; }}
