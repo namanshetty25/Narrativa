@@ -63,6 +63,17 @@ export async function POST(req: NextRequest) {
       text: text,
     });
 
+    // Save the PDF locally for the slide generator
+    if (source.type === 'pdf') {
+      const fs = await import('fs');
+      const path = await import('path');
+      const uploadDir = path.join(process.cwd(), '.data', 'uploads');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(uploadDir, `${source.id}.pdf`), buffer);
+    }
+
     // Generate embeddings for all chunks and persist them
     try {
       const chunkTexts = chunks.map((c: { text: string }) => c.text);

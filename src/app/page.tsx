@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart } from 'lucide-react';
+import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart, Link as LinkIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -19,7 +19,7 @@ type Message = {
   content: string;
 };
 
-type ModalType = 'audio' | 'summary' | null;
+type ModalType = 'audio' | 'summary' | 'slides' | null;
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -34,6 +34,8 @@ export default function Home() {
     { role: 'ai', content: 'Welcome to **Narrativa**! Upload your documents using the sidebar, then ask me anything about them. I\'ll answer based strictly on your sources.' }
   ]);
   const [input, setInput] = useState('');
+  const [urlInput, setUrlInput] = useState('');
+  const [isUrlAdding, setIsUrlAdding] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -42,7 +44,7 @@ export default function Home() {
   // Panel state
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(true);
-  const [activeModal, setActiveModal] = useState<ModalType>(null);
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
 
   // Audio state
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
@@ -57,9 +59,15 @@ export default function Home() {
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // Summary state
+  // Summary state
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [summaryContent, setSummaryContent] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+
+  // Slides state
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+  const [slideUrl, setSlideUrl] = useState<string | null>(null);
+  const [slideError, setSlideError] = useState<string | null>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -109,7 +117,11 @@ export default function Home() {
     setAudioGenerationStatus('Generating script from your sources...');
 
     try {
-      const res = await fetch('/api/generate-audio', { method: 'POST' });
+      const res = await fetch('/api/generate-audio', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedSourceIds })
+      });
 
       if (!res.ok) {
         const data = await res.json();
@@ -163,7 +175,11 @@ export default function Home() {
     setSummaryContent(null);
 
     try {
-      const res = await fetch('/api/generate-summary', { method: 'POST' });
+      const res = await fetch('/api/generate-summary', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ selectedSourceIds })
+      });
       const data = await res.json();
 
       if (res.ok && data.success) {
@@ -176,6 +192,39 @@ export default function Home() {
       setSummaryError('Connection error. Please try again.');
     } finally {
       setIsGeneratingSummary(false);
+    }
+  };
+
+  const handleGenerateSlides = async () => {
+    // Find the first selected PDF source
+    const selectedPdfs = sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id));
+    if (isGeneratingSlides || selectedPdfs.length === 0) return;
+    
+    // Grab the first selected PDF
+    const source = selectedPdfs[0];
+    
+    setIsGeneratingSlides(true);
+    setSlideError(null);
+    setSlideUrl(null);
+
+    try {
+      const res = await fetch('/api/generate-slides', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sourceId: source.id })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setSlideUrl(data.slideUrl);
+      } else {
+        setSlideError(data.error || 'Failed to generate slides');
+      }
+    } catch (err) {
+      console.error('Slide generation error:', err);
+      setSlideError('Connection error. Please try again.');
+    } finally {
+      setIsGeneratingSlides(false);
     }
   };
 
@@ -199,7 +248,7 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages }),
+        body: JSON.stringify({ messages: updatedMessages, selectedSourceIds }),
       });
 
       if (!res.ok) {
@@ -278,10 +327,40 @@ export default function Home() {
     }
   };
 
+  const handleAddUrl = async () => {
+    if (!urlInput.trim() || isUrlAdding) return;
+    setIsUrlAdding(true);
+
+    try {
+      const res = await fetch('/api/fetch-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: urlInput }),
+      });
+      const data = await res.json();
+      if (data.success && data.source) {
+        setSources(prev => [...prev, data.source]);
+        setMessages(prev => [...prev, {
+          role: 'ai',
+          content: `🔗 **${data.source.name}** has been fetched and indexed. You can now ask questions about it!`
+        }]);
+        setUrlInput('');
+      } else {
+        alert(data.error || 'Failed to fetch URL');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error fetching URL');
+    } finally {
+      setIsUrlAdding(false);
+    }
+  };
+
   const handleDeleteSource = async (id: string) => {
     try {
       await fetch(`/api/sources/${id}`, { method: 'DELETE' });
       setSources(prev => prev.filter(s => s.id !== id));
+      setSelectedSourceIds(prev => prev.filter(sId => sId !== id));
     } catch (err) {
       console.error(err);
     }
@@ -306,6 +385,15 @@ export default function Home() {
             <div className={styles.sourceList}>
               {sources.map(source => (
                 <div key={source.id} className={styles.sourceItem}>
+                  <input
+                    type="checkbox"
+                    checked={selectedSourceIds.includes(source.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) setSelectedSourceIds(prev => [...prev, source.id]);
+                      else setSelectedSourceIds(prev => prev.filter(id => id !== source.id));
+                    }}
+                    className={styles.sourceCheckbox}
+                  />
                   <FileText size={16} className={styles.sourceIcon} />
                   <span className={styles.sourceName}>{source.name}</span>
                   <button
@@ -334,17 +422,45 @@ export default function Home() {
               onChange={handleFileChange}
             />
 
-            <button
-              className={styles.uploadButton}
-              onClick={handleUploadClick}
-              disabled={isUploading}
-            >
-              {isUploading
-                ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
-                : <Plus size={18} />
-              }
-              <span>{isUploading ? 'Uploading...' : 'Add Source'}</span>
-            </button>
+            <div className={styles.addSourceSection}>
+              <div className={styles.urlInputWrapper}>
+                <input 
+                  type="url" 
+                  className={styles.urlInput} 
+                  placeholder="Paste Youtube or Web Link..."
+                  value={urlInput}
+                  onChange={e => setUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddUrl();
+                  }}
+                  disabled={isUrlAdding}
+                />
+                <button 
+                  className={styles.urlAddButton}
+                  onClick={handleAddUrl}
+                  disabled={isUrlAdding || !urlInput.trim()}
+                  title="Add Link"
+                >
+                  {isUrlAdding ? <Loader2 size={16} className={styles.spin} /> : <LinkIcon size={16} />}
+                </button>
+              </div>
+              
+              <div className={styles.divider}>
+                 <span>OR</span>
+              </div>
+
+              <button
+                className={styles.uploadButton}
+                onClick={handleUploadClick}
+                disabled={isUploading}
+              >
+                {isUploading
+                  ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Plus size={18} />
+                }
+                <span>{isUploading ? 'Uploading...' : 'Upload Document'}</span>
+              </button>
+            </div>
           </>
         )}
 
@@ -431,229 +547,78 @@ export default function Home() {
             </div>
 
             <div className={styles.featureList}>
+              {/* --- AUDIO BUTTON --- */}
               <button
-                className={`${styles.featureItem} ${activeModal === 'audio' ? styles.featureItemActive : ''}`}
-                onClick={() => setActiveModal('audio')}
+                className={`${styles.featureItem} ${audioUrl ? styles.successBorder : ''}`}
+                onClick={() => {
+                  if (audioUrl) {
+                    window.open(audioUrl, '_blank');
+                  } else {
+                    handleGenerateAudio();
+                  }
+                }}
+                disabled={isGeneratingAudio || selectedSourceIds.length === 0}
+                title={selectedSourceIds.length === 0 ? "Select at least one source" : "Generate Audio"}
               >
                 <div className={styles.featureIconWrap}>
-                  <Headphones size={20} />
+                  {isGeneratingAudio ? <Loader2 size={20} className={styles.spin} /> : <Headphones size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>Audio Overview</span>
-                  <span className={styles.featureDesc}>Listen to your sources</span>
+                  <span className={styles.featureName}>{audioUrl ? 'Open Audio' : 'Audio Overview'}</span>
+                  <span className={styles.featureDesc}>{audioUrl ? 'Ready to listen' : 'Listen to sources'}</span>
                 </div>
               </button>
 
+              {/* --- SUMMARY BUTTON --- */}
               <button
-                className={`${styles.featureItem} ${activeModal === 'summary' ? styles.featureItemActive : ''}`}
-                onClick={() => setActiveModal('summary')}
+                className={`${styles.featureItem} ${summaryContent ? styles.successBorder : ''}`}
+                onClick={() => {
+                  if (summaryContent) {
+                    // Open summary in a new tab as a blob
+                    const blob = new Blob([summaryContent], { type: 'text/markdown' });
+                    const url = URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                  } else {
+                    handleGenerateSummary();
+                  }
+                }}
+                disabled={isGeneratingSummary || selectedSourceIds.length === 0}
+                title={selectedSourceIds.length === 0 ? "Select at least one source" : "Generate Summary"}
               >
                 <div className={styles.featureIconWrap}>
-                  <FileBarChart size={20} />
+                  {isGeneratingSummary ? <Loader2 size={20} className={styles.spin} /> : <FileBarChart size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>Summary</span>
-                  <span className={styles.featureDesc}>One-page report</span>
+                  <span className={styles.featureName}>{summaryContent ? 'View Summary' : 'Summary'}</span>
+                  <span className={styles.featureDesc}>{summaryContent ? 'Ready to read' : 'One-page report'}</span>
                 </div>
               </button>
 
-              <button className={`${styles.featureItem} ${styles.featureItemDisabled}`} disabled>
+              {/* --- SLIDES BUTTON --- */}
+              <button
+                className={`${styles.featureItem} ${slideUrl ? styles.successBorder : ''}`}
+                onClick={() => {
+                  if (slideUrl) {
+                    window.open(slideUrl, '_blank');
+                  } else {
+                    handleGenerateSlides();
+                  }
+                }}
+                disabled={isGeneratingSlides || sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id)).length === 0}
+                title={sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id)).length === 0 ? "Select at least one PDF source" : "Generate Slides"}
+              >
                 <div className={styles.featureIconWrap}>
-                  <Presentation size={20} />
+                  {isGeneratingSlides ? <Loader2 size={20} className={styles.spin} /> : <Presentation size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>Slides Generator</span>
-                  <span className={styles.featureDesc}>Coming soon</span>
+                  <span className={styles.featureName}>{slideUrl ? 'Open Slides' : 'Slides Generator'}</span>
+                  <span className={styles.featureDesc}>{slideUrl ? 'Ready to present' : 'Turn PDFs into slides'}</span>
                 </div>
               </button>
             </div>
           </>
         )}
       </aside>
-
-      {/* ===== MODAL: Audio Overview ===== */}
-      {activeModal === 'audio' && (
-        <div className={styles.modalOverlay} onClick={() => setActiveModal(null)}>
-          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <div className={styles.modalTitle}>
-                <Headphones size={20} />
-                <span>Audio Overview</span>
-              </div>
-              <button className={styles.modalClose} onClick={() => setActiveModal(null)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className={styles.modalBody}>
-              {/* Generate button */}
-              {!audioUrl && !isGeneratingAudio && (
-                <button
-                  className={styles.generateAudioButton}
-                  onClick={handleGenerateAudio}
-                  disabled={sources.length === 0}
-                  title={sources.length === 0 ? 'Upload sources first' : 'Generate audio explanation'}
-                >
-                  <Headphones size={18} />
-                  <span>Generate Audio Overview</span>
-                </button>
-              )}
-
-              {/* Loading state */}
-              {isGeneratingAudio && (
-                <div className={styles.audioGenerating}>
-                  <div className={styles.audioGeneratingPulse}>
-                    <Loader2 size={24} className={styles.spinIcon} />
-                  </div>
-                  <span className={styles.audioGeneratingText}>{audioGenerationStatus}</span>
-                </div>
-              )}
-
-              {/* Error state */}
-              {audioError && (
-                <div className={styles.audioError}>
-                  <span>⚠️ {audioError}</span>
-                  <button className={styles.audioRetryButton} onClick={handleGenerateAudio}>
-                    Retry
-                  </button>
-                </div>
-              )}
-
-              {/* Audio Player */}
-              {audioUrl && (
-                <div className={styles.audioPlayer}>
-                  <audio ref={audioRef} src={audioUrl} preload="metadata" />
-
-                  <div className={styles.audioControls}>
-                    <button className={styles.playPauseButton} onClick={togglePlayPause}>
-                      {isPlaying ? <Pause size={22} /> : <Play size={22} />}
-                    </button>
-
-                    <div className={styles.audioProgress}>
-                      <div className={styles.progressBar} onClick={handleSeek}>
-                        <div
-                          className={styles.progressFilled}
-                          style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-                        />
-                        <div
-                          className={styles.progressThumb}
-                          style={{ left: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
-                        />
-                      </div>
-                      <div className={styles.audioTime}>
-                        <span>{formatTime(currentTime)}</span>
-                        <span>{formatTime(duration)}</span>
-                      </div>
-                    </div>
-
-                    <Volume2 size={16} className={styles.volumeIcon} />
-                  </div>
-
-                  <button
-                    className={styles.transcriptToggle}
-                    onClick={() => setShowTranscript(!showTranscript)}
-                  >
-                    <span>Transcript</span>
-                    {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  </button>
-
-                  {showTranscript && audioScript && (
-                    <div className={styles.transcriptContent}>
-                      {audioScript}
-                    </div>
-                  )}
-
-                  <button
-                    className={styles.regenerateButton}
-                    onClick={handleGenerateAudio}
-                    disabled={isGeneratingAudio}
-                  >
-                    Regenerate
-                  </button>
-                </div>
-              )}
-
-              {sources.length === 0 && !audioUrl && !isGeneratingAudio && (
-                <p className={styles.modalHint}>Upload at least one source document to generate an audio overview.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== MODAL: Summary ===== */}
-      {activeModal === 'summary' && (
-        <div className={styles.modalOverlay} onClick={() => setActiveModal(null)}>
-          <div className={`${styles.modalContent} ${styles.modalWide}`} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <div className={styles.modalTitle}>
-                <FileBarChart size={20} />
-                <span>Summary Report</span>
-              </div>
-              <button className={styles.modalClose} onClick={() => setActiveModal(null)}>
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className={styles.modalBody}>
-              {/* Generate button */}
-              {!summaryContent && !isGeneratingSummary && (
-                <button
-                  className={styles.generateAudioButton}
-                  onClick={handleGenerateSummary}
-                  disabled={sources.length === 0}
-                >
-                  <FileBarChart size={18} />
-                  <span>Generate Summary</span>
-                </button>
-              )}
-
-              {/* Loading */}
-              {isGeneratingSummary && (
-                <div className={styles.audioGenerating}>
-                  <div className={styles.audioGeneratingPulse}>
-                    <Loader2 size={24} className={styles.spinIcon} />
-                  </div>
-                  <span className={styles.audioGeneratingText}>Generating summary report...</span>
-                </div>
-              )}
-
-              {/* Error */}
-              {summaryError && (
-                <div className={styles.audioError}>
-                  <span>⚠️ {summaryError}</span>
-                  <button className={styles.audioRetryButton} onClick={handleGenerateSummary}>Retry</button>
-                </div>
-              )}
-
-              {/* Summary content */}
-              {summaryContent && (
-                <div className={styles.summaryReport}>
-                  <div className={styles.summaryBody}>
-                    <ReactMarkdown
-                      remarkPlugins={[remarkMath, remarkGfm]}
-                      rehypePlugins={[rehypeKatex]}
-                    >
-                      {summaryContent}
-                    </ReactMarkdown>
-                  </div>
-                  <button
-                    className={styles.regenerateButton}
-                    onClick={handleGenerateSummary}
-                    disabled={isGeneratingSummary}
-                  >
-                    Regenerate
-                  </button>
-                </div>
-              )}
-
-              {sources.length === 0 && !summaryContent && !isGeneratingSummary && (
-                <p className={styles.modalHint}>Upload at least one source document to generate a summary.</p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

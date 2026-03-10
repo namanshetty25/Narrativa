@@ -19,7 +19,9 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(process.cwd(), 'scripts', 'tts.py');
 
-    const proc = spawn('python', [pythonScript, outputPath], {
+    // Use the virtual environment Python
+    const pythonExecutable = path.join(process.cwd(), '.venv', 'bin', 'python');
+    const proc = spawn(pythonExecutable, [pythonScript, outputPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
       timeout: 120000, // 2 minutes for TTS only
     });
@@ -48,7 +50,7 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
   });
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -58,17 +60,24 @@ export async function POST() {
       );
     }
 
+    const { selectedSourceIds } = await req.json().catch(() => ({ selectedSourceIds: [] }));
+
     // 1. Load all source texts
     const store = loadStore();
-    if (store.sources.length === 0) {
+    let availableChunks = store.chunks;
+    if (selectedSourceIds && selectedSourceIds.length > 0) {
+      availableChunks = availableChunks.filter(c => selectedSourceIds.includes(c.sourceId));
+    }
+
+    if (availableChunks.length === 0) {
       return NextResponse.json(
-        { error: 'No sources uploaded. Please upload documents first.' },
+        { error: 'No sources selected or available.' },
         { status: 400 }
       );
     }
 
     // Gather source content (use chunks for better context)
-    const allContent = store.chunks
+    const allContent = availableChunks
       .map((c, i) => `[Section ${i + 1}]\n${c.text}`)
       .join('\n\n---\n\n');
 

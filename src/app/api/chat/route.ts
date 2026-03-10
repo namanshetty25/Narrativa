@@ -5,7 +5,7 @@ import { loadStore } from '@/lib/store';
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages } = await req.json();
+    const { messages, selectedSourceIds } = await req.json();
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: 'Invalid messages format' }, { status: 400 });
@@ -26,14 +26,19 @@ export async function POST(req: NextRequest) {
     // 1. Retrieve relevant context from uploaded documents
     const store = loadStore();
     let contextText = '';
+    
+    let availableChunks = store.chunks;
+    if (selectedSourceIds && selectedSourceIds.length > 0) {
+      availableChunks = availableChunks.filter(c => selectedSourceIds.includes(c.sourceId));
+    }
 
-    if (store.chunks.length > 0) {
-      const retrievedChunks = await retrieveRelevantChunks(query, 8);
+    if (availableChunks.length > 0) {
+      const retrievedChunks = await retrieveRelevantChunks(query, 8, selectedSourceIds);
       if (retrievedChunks.length > 0) {
         contextText = retrievedChunks.map((c, i) => `[Excerpt ${i + 1}]\n${c.text}`).join('\n\n---\n\n');
       } else {
         // If keyword search returned nothing, just use a sample of all chunks
-        contextText = store.chunks.slice(0, 8).map((c, i) => `[Excerpt ${i + 1}]\n${c.text}`).join('\n\n---\n\n');
+        contextText = availableChunks.slice(0, 8).map((c, i) => `[Excerpt ${i + 1}]\n${c.text}`).join('\n\n---\n\n');
       }
     }
 

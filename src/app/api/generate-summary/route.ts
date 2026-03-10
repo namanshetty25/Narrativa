@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { loadStore } from '@/lib/store';
 
-export async function POST() {
+export async function POST(req: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -12,16 +12,23 @@ export async function POST() {
       );
     }
 
+    const { selectedSourceIds } = await req.json().catch(() => ({ selectedSourceIds: [] }));
+
     const store = loadStore();
-    if (store.sources.length === 0) {
+    let availableChunks = store.chunks;
+    if (selectedSourceIds && selectedSourceIds.length > 0) {
+      availableChunks = availableChunks.filter(c => selectedSourceIds.includes(c.sourceId));
+    }
+
+    if (availableChunks.length === 0) {
       return NextResponse.json(
-        { error: 'No sources uploaded. Please upload documents first.' },
+        { error: 'No sources selected or available.' },
         { status: 400 }
       );
     }
 
     // Gather all source content
-    const allContent = store.chunks
+    const allContent = availableChunks
       .map((c, i) => `[Section ${i + 1}]\n${c.text}`)
       .join('\n\n---\n\n');
 
