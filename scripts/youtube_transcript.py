@@ -4,9 +4,9 @@ from youtube_transcript_api.formatters import TextFormatter
 
 def get_transcript(video_id):
     try:
-        # Retrieve the transcript data
-        # We can specify languages if needed, but the API handles defaults well
-        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        # Retrieve the transcript data using the v1.x instance-based API
+        ytt = YouTubeTranscriptApi()
+        transcript = ytt.fetch(video_id)
 
         # Use the TextFormatter to get a clean, continuous text string
         formatter = TextFormatter()
