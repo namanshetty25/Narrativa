@@ -23,6 +23,7 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # app runtime data
 .data/
@@ -36,7 +37,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 .env.local
 
@@ -51,3 +52,23 @@ next-env.d.ts
 .venv/
 __pycache__/
 *.pyc
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+
+# PDF inputs (user-specific)
+*.pdf
+
+# Output directories (slide_generator)
+*_slides/
+output*/
+
+# SAM3 model weights
+sam3/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
