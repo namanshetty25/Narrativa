@@ -590,54 +590,59 @@ EXTRACTED TABLES:
 
 
 # ================================================================
-# TOOL 7: Render Slides
+# TOOL 7: Bundle Slides (Reveal.js JSON)
 # ================================================================
 
 @tool
-def render_slides(slide_plans_json: str, assets_json: str, slide_counter: int, output_dir: str) -> str:
-    """Render planned slides as standalone HTML files.
+def bundle_slides(slide_plans_json: str, assets_json: str, output_dir: str) -> str:
+    """Bundle planned slides into a single deck.json file for Reveal.js.
 
     Args:
         slide_plans_json: JSON string of slide plans array.
         assets_json: JSON string of processed assets (for resolving image paths).
-        slide_counter: Starting slide number for filenames.
-        output_dir: Output directory.
+        output_dir: Output directory where deck.json will be saved or appended to.
 
     Returns:
-        JSON string with list of created slide file paths and next_counter.
+        JSON string indicating success and the number of slides bundled.
     """
-    from templates import render_slide
-
     plans = _parse_json_safe(slide_plans_json, "slide_plans", default=[])
     assets = _parse_json_safe(assets_json, "assets", default=[])
-    slides_dir = os.path.join(output_dir, "slides")
-    os.makedirs(slides_dir, exist_ok=True)
-
-    html_paths = []
-    counter = slide_counter
+    
+    deck_path = os.path.join(output_dir, "deck.json")
+    
+    # Load existing deck if appending, else create new
+    if os.path.exists(deck_path):
+        with open(deck_path, "r", encoding="utf-8") as f:
+            deck = json.load(f)
+    else:
+        deck = {
+            "title": "Narrativa Presentation",
+            "slides": []
+        }
 
     for plan in plans:
-        # Resolve image paths from asset indices
+        # Resolve image paths from asset indices to be relative for the web viewer
         assigned_images = []
         for img_assignment in plan.get("images", []):
             idx = img_assignment.get("image_index", 0) - 1
             if 0 <= idx < len(assets):
+                # The Next.js API will serve these from the output dir
+                basename = os.path.basename(assets[idx]["path"])
                 assigned_images.append({
-                    "path": assets[idx]["path"],
+                    "path": basename,  # Just store basename, Next.js handles the rest
                     "size": img_assignment.get("size", "medium"),
                     "position": img_assignment.get("position", "right"),
                 })
         plan["images"] = assigned_images
+        
+        # Add to deck
+        deck["slides"].append(plan)
 
-        html = render_slide(plan)
-        slide_path = os.path.join(slides_dir, f"slide_{counter:03d}.html")
-        with open(slide_path, "w", encoding="utf-8") as f:
-            f.write(html)
+    # Save updated deck
+    with open(deck_path, "w", encoding="utf-8") as f:
+        json.dump(deck, f, indent=2)
 
-        html_paths.append(slide_path)
-        counter += 1
-
-    return json.dumps({"paths": html_paths, "next_counter": counter})
+    return json.dumps({"status": "success", "total_slides": len(deck["slides"])})
 
 
 # ================================================================
@@ -650,5 +655,6 @@ ALL_TOOLS = [
     extract_tables,
     process_asset,
     plan_slides,
-    render_slides,
+    bundle_slides,
 ]
+

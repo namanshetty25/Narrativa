@@ -20,9 +20,10 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
     const pythonScript = path.join(process.cwd(), 'scripts', 'tts.py');
 
     // Use the virtual environment Python
-    const pythonExecutable = path.join(process.cwd(), '.venv', 'bin', 'python');
+    const pythonExecutable = path.join(process.cwd(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
     const proc = spawn(pythonExecutable, [pythonScript, outputPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
       timeout: 120000, // 2 minutes for TTS only
     });
 
@@ -52,10 +53,10 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY not set.' },
+        { error: 'GOOGLE_API_KEY not set.' },
         { status: 500 }
       );
     }

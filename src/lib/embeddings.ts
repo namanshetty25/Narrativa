@@ -3,7 +3,7 @@ import { GoogleGenAI } from "@google/genai";
 const EMBEDDING_MODEL = "gemini-embedding-001";
 
 function getAI(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY;
 
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY environment variable is not set.");

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
@@ -25,43 +25,49 @@ export async function POST(req: NextRequest) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const pythonPath = path.join(process.cwd(), '.venv', 'bin', 'python');
+    const pythonPath = path.join(process.cwd(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
     const scriptPath = path.join(process.cwd(), 'main.py');
 
-    console.log(`🎨 Generating slides for ${sourceId}...`);
+    console.log(`Generating slides for ${sourceId}...`);
     
     try {
-      execSync(`${pythonPath} ${scriptPath} --pdf "${pdfPath}" --output "${outputDir}"`, {
-        encoding: 'utf8',
-        timeout: 300000 // 5 minutes timeout for AI processing
+      await new Promise<void>((resolve, reject) => {
+        exec(`"${pythonPath}" "${scriptPath}" --pdf "${pdfPath}" --output "${outputDir}"`, {
+          encoding: 'utf8',
+          env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+          timeout: 300000 // 5 minutes timeout for AI processing
+        }, (error, stdout, stderr) => {
+          if (error) {
+            reject(new Error(`Slide generation failed: ${stderr || error.message}`));
+          } else {
+            resolve();
+          }
+        });
       });
     } catch (execError: any) {
-      const stderr = execError.stderr?.toString() || '';
-      console.error('Python Helper Error:', stderr);
-      throw new Error(`Slide generation failed: ${stderr || execError.message}`);
+      console.error('Python Helper Error:', execError.message);
+      throw execError;
     }
 
-    // Verify slide files were generated
-    const slidesDir = path.join(outputDir, 'slides');
-    if (!fs.existsSync(slidesDir)) {
-      throw new Error('Slide generation completed but output directory not found');
+    // Verify deck.json was generated
+    const deckPath = path.join(outputDir, 'deck.json');
+    if (!fs.existsSync(deckPath)) {
+      throw new Error('Slide generation completed but deck.json not found');
     }
 
-    const slides = fs.readdirSync(slidesDir)
-      .filter(file => file.endsWith('.html'))
-      .sort(); // Usually they are named like 001_slide.html
+    // Read the deck to count slides (optional, but good for validation)
+    const deckRaw = fs.readFileSync(deckPath, 'utf8');
+    const deckData = JSON.parse(deckRaw);
 
-    if (slides.length === 0) {
-      throw new Error('No slide HTML files were generated');
+    if (!deckData.slides || deckData.slides.length === 0) {
+      throw new Error('No slides were generated in the deck');
     }
 
-    // Return the URL path to the first slide
-    const firstSlideUrl = `/slides/${sourceId}/slides/${slides[0]}`;
-
+    // Return the URL path to the dynamic Next.js viewer
     return NextResponse.json({ 
       success: true, 
-      slideUrl: firstSlideUrl,
-      slidesCount: slides.length
+      slideUrl: `/deck/${sourceId}`,
+      slidesCount: deckData.slides.length
     });
 
   } catch (error: any) {

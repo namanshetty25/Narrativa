@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart, Link as LinkIcon } from 'lucide-react';
+import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart, Link as LinkIcon, Package } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -19,7 +19,21 @@ type Message = {
   content: string;
 };
 
-type ModalType = 'audio' | 'summary' | 'slides' | null;
+type Artifact = {
+  id: string;
+  type: 'audio' | 'summary' | 'slides';
+  label: string;
+  sourceIds: string[];
+  url?: string;
+  content?: string;
+  script?: string;
+  timestamp: number;
+};
+
+type ActiveModal = {
+  type: 'audio' | 'summary' | 'slides';
+  artifact: Artifact;
+} | null;
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds)) return '0:00';
@@ -46,42 +60,73 @@ export default function Home() {
   const [rightOpen, setRightOpen] = useState(true);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
 
-  // Audio state
+  // Generation loading states
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [audioGenerationStatus, setAudioGenerationStatus] = useState('');
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [audioScript, setAudioScript] = useState<string | null>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+
+  // Audio player state
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [showTranscript, setShowTranscript] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  // Summary state
-  // Summary state
-  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
-  const [summaryContent, setSummaryContent] = useState<string | null>(null);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
+  // Toast state
+  const [toast, setToast] = useState<{ message: string, type: 'error' | 'success' | 'info' } | null>(null);
 
-  // Slides state
-  const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
-  const [slideUrl, setSlideUrl] = useState<string | null>(null);
-  const [slideError, setSlideError] = useState<string | null>(null);
+  // Artifacts & Modal state
+  const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [activeModal, setActiveModal] = useState<ActiveModal>(null);
+
+  const showToast = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  // Helper: build a human-readable label from selected source indices
+  const getSourceLabel = (ids: string[]): string => {
+    const indices = ids.map(id => {
+      const idx = sources.findIndex(s => s.id === id);
+      return idx >= 0 ? idx + 1 : null;
+    }).filter(Boolean);
+    if (indices.length === 0) return 'Sources';
+    return `Source-${indices.join(', ')}`;
+  };
+
+  // Helper: find existing artifact matching type + sourceIds
+  const findExistingArtifact = (type: Artifact['type'], sourceIds: string[]): Artifact | undefined => {
+    const sorted = [...sourceIds].sort();
+    return artifacts.find(a =>
+      a.type === type &&
+      a.sourceIds.length === sorted.length &&
+      [...a.sourceIds].sort().every((id, i) => id === sorted[i])
+    );
+  };
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load sources on mount
+  // Load sources and artifacts on mount
   useEffect(() => {
+    // Load sources
     fetch('/api/sources')
       .then(res => res.json())
       .then(data => {
         if (data.sources) setSources(data.sources);
       })
       .catch(err => console.error("Failed to load sources", err));
+
+    // Load persisted artifacts
+    fetch('/api/artifacts')
+      .then(res => res.json())
+      .then(data => {
+        if (data.artifacts) setArtifacts(data.artifacts);
+      })
+      .catch(err => console.error("Failed to load artifacts", err));
   }, []);
 
   // Audio time update
@@ -105,19 +150,25 @@ export default function Home() {
       audio.removeEventListener('loadedmetadata', handleDurationChange);
       audio.removeEventListener('ended', handleEnded);
     };
-  }, [audioUrl]);
+  }, [activeModal]);
+
+  // ===== GENERATION HANDLERS =====
 
   const handleGenerateAudio = async () => {
-    if (isGeneratingAudio || sources.length === 0) return;
+    if (isGeneratingAudio || selectedSourceIds.length === 0) return;
+
+    // Check for existing artifact
+    const existing = findExistingArtifact('audio', selectedSourceIds);
+    if (existing) {
+      setActiveModal({ type: 'audio', artifact: existing });
+      return;
+    }
 
     setIsGeneratingAudio(true);
-    setAudioError(null);
-    setAudioUrl(null);
-    setAudioScript(null);
     setAudioGenerationStatus('Generating script from your sources...');
 
     try {
-      const res = await fetch('/api/generate-audio', { 
+      const res = await fetch('/api/generate-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selectedSourceIds })
@@ -125,7 +176,7 @@ export default function Home() {
 
       if (!res.ok) {
         const data = await res.json();
-        setAudioError(data.error || 'Failed to generate audio');
+        showToast(data.error || 'Failed to generate audio', 'error');
         setIsGeneratingAudio(false);
         setAudioGenerationStatus('');
         return;
@@ -135,16 +186,33 @@ export default function Home() {
       const data = await res.json();
 
       if (data.success) {
-        setAudioUrl(data.audioUrl);
-        setAudioScript(data.script);
+        const artifact: Artifact = {
+          id: crypto.randomUUID(),
+          type: 'audio',
+          label: `${getSourceLabel(selectedSourceIds)} Audio`,
+          sourceIds: [...selectedSourceIds],
+          url: data.audioUrl,
+          script: data.script,
+          timestamp: Date.now(),
+        };
+        
+        // Save globally
+        await fetch('/api/artifacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(artifact)
+        });
+
+        setArtifacts(prev => [...prev, artifact]);
+        setActiveModal({ type: 'audio', artifact });
         setAudioGenerationStatus('');
       } else {
-        setAudioError(data.error || 'Audio generation failed');
+        showToast(data.error || 'Audio generation failed', 'error');
         setAudioGenerationStatus('');
       }
     } catch (err) {
       console.error('Audio generation error:', err);
-      setAudioError('Connection error. Please try again.');
+      showToast('Connection error. Please try again.', 'error');
       setAudioGenerationStatus('');
     } finally {
       setIsGeneratingAudio(false);
@@ -169,13 +237,19 @@ export default function Home() {
   };
 
   const handleGenerateSummary = async () => {
-    if (isGeneratingSummary || sources.length === 0) return;
+    if (isGeneratingSummary || selectedSourceIds.length === 0) return;
+
+    // Check for existing artifact
+    const existing = findExistingArtifact('summary', selectedSourceIds);
+    if (existing) {
+      setActiveModal({ type: 'summary', artifact: existing });
+      return;
+    }
+
     setIsGeneratingSummary(true);
-    setSummaryError(null);
-    setSummaryContent(null);
 
     try {
-      const res = await fetch('/api/generate-summary', { 
+      const res = await fetch('/api/generate-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selectedSourceIds })
@@ -183,32 +257,52 @@ export default function Home() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSummaryContent(data.summary);
+        const artifact: Artifact = {
+          id: crypto.randomUUID(),
+          type: 'summary',
+          label: `${getSourceLabel(selectedSourceIds)} Summary`,
+          sourceIds: [...selectedSourceIds],
+          content: data.summary,
+          timestamp: Date.now(),
+        };
+
+        // Save globally
+        await fetch('/api/artifacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(artifact)
+        });
+
+        setArtifacts(prev => [...prev, artifact]);
+        setActiveModal({ type: 'summary', artifact });
       } else {
-        setSummaryError(data.error || 'Failed to generate summary');
+        showToast(data.error || 'Failed to generate summary', 'error');
       }
     } catch (err) {
       console.error('Summary error:', err);
-      setSummaryError('Connection error. Please try again.');
+      showToast('Connection error. Please try again.', 'error');
     } finally {
       setIsGeneratingSummary(false);
     }
   };
 
   const handleGenerateSlides = async () => {
-    // Find the first selected PDF source
     const selectedPdfs = sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id));
     if (isGeneratingSlides || selectedPdfs.length === 0) return;
-    
-    // Grab the first selected PDF
+
     const source = selectedPdfs[0];
-    
+
+    // Check for existing artifact
+    const existing = findExistingArtifact('slides', [source.id]);
+    if (existing && existing.url) {
+      window.open(existing.url, '_blank');
+      return;
+    }
+
     setIsGeneratingSlides(true);
-    setSlideError(null);
-    setSlideUrl(null);
 
     try {
-      const res = await fetch('/api/generate-slides', { 
+      const res = await fetch('/api/generate-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceId: source.id })
@@ -216,17 +310,36 @@ export default function Home() {
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setSlideUrl(data.slideUrl);
+        const artifact: Artifact = {
+          id: crypto.randomUUID(),
+          type: 'slides',
+          label: `${getSourceLabel([source.id])} Slides`,
+          sourceIds: [source.id],
+          url: data.slideUrl,
+          timestamp: Date.now(),
+        };
+
+        // Save globally
+        await fetch('/api/artifacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(artifact)
+        });
+
+        setArtifacts(prev => [...prev, artifact]);
+        setActiveModal({ type: 'slides', artifact });
       } else {
-        setSlideError(data.error || 'Failed to generate slides');
+        showToast(data.error || 'Failed to generate slides', 'error');
       }
     } catch (err) {
       console.error('Slide generation error:', err);
-      setSlideError('Connection error. Please try again.');
+      showToast('Connection error. Please try again.', 'error');
     } finally {
       setIsGeneratingSlides(false);
     }
   };
+
+  // ===== CHAT HANDLER =====
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isSending) return;
@@ -291,6 +404,8 @@ export default function Home() {
     }
   }, [input, isSending, messages]);
 
+  // ===== SOURCE HANDLERS =====
+
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -316,11 +431,11 @@ export default function Home() {
           content: `📄 **${data.source.name}** has been uploaded and indexed. You can now ask questions about it!`
         }]);
       } else {
-        alert(data.error || 'Upload failed');
+        showToast(data.error || 'Upload failed', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error uploading file');
+      showToast('Error uploading file', 'error');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -346,11 +461,11 @@ export default function Home() {
         }]);
         setUrlInput('');
       } else {
-        alert(data.error || 'Failed to fetch URL');
+        showToast(data.error || 'Failed to fetch URL', 'error');
       }
     } catch (err) {
       console.error(err);
-      alert('Error fetching URL');
+      showToast('Error fetching URL', 'error');
     } finally {
       setIsUrlAdding(false);
     }
@@ -364,6 +479,18 @@ export default function Home() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  // ===== MODAL CLOSE =====
+  const closeModal = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setShowTranscript(false);
+    setActiveModal(null);
   };
 
   return (
@@ -383,7 +510,7 @@ export default function Home() {
             </div>
 
             <div className={styles.sourceList}>
-              {sources.map(source => (
+              {sources.map((source, index) => (
                 <div key={source.id} className={styles.sourceItem}>
                   <input
                     type="checkbox"
@@ -395,7 +522,9 @@ export default function Home() {
                     className={styles.sourceCheckbox}
                   />
                   <FileText size={16} className={styles.sourceIcon} />
-                  <span className={styles.sourceName}>{source.name}</span>
+                  <span className={styles.sourceName}>
+                    <span className={styles.sourceLabel}>Source-{index + 1}:</span> {source.name}
+                  </span>
                   <button
                     className={styles.deleteButton}
                     onClick={() => handleDeleteSource(source.id)}
@@ -424,9 +553,9 @@ export default function Home() {
 
             <div className={styles.addSourceSection}>
               <div className={styles.urlInputWrapper}>
-                <input 
-                  type="url" 
-                  className={styles.urlInput} 
+                <input
+                  type="url"
+                  className={styles.urlInput}
                   placeholder="Paste Youtube or Web Link..."
                   value={urlInput}
                   onChange={e => setUrlInput(e.target.value)}
@@ -435,7 +564,7 @@ export default function Home() {
                   }}
                   disabled={isUrlAdding}
                 />
-                <button 
+                <button
                   className={styles.urlAddButton}
                   onClick={handleAddUrl}
                   disabled={isUrlAdding || !urlInput.trim()}
@@ -444,7 +573,7 @@ export default function Home() {
                   {isUrlAdding ? <Loader2 size={16} className={styles.spin} /> : <LinkIcon size={16} />}
                 </button>
               </div>
-              
+
               <div className={styles.divider}>
                  <span>OR</span>
               </div>
@@ -529,7 +658,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* ===== RIGHT SIDEBAR: Features ===== */}
+      {/* ===== RIGHT SIDEBAR: Studio + Artifacts ===== */}
       <aside className={`${styles.sidebar} ${styles.rightSidebar} ${!rightOpen ? styles.sidebarCollapsed : ''}`}>
         <button
           className={`${styles.collapseToggle} ${styles.collapseToggleRight}`}
@@ -549,14 +678,8 @@ export default function Home() {
             <div className={styles.featureList}>
               {/* --- AUDIO BUTTON --- */}
               <button
-                className={`${styles.featureItem} ${audioUrl ? styles.successBorder : ''}`}
-                onClick={() => {
-                  if (audioUrl) {
-                    window.open(audioUrl, '_blank');
-                  } else {
-                    handleGenerateAudio();
-                  }
-                }}
+                className={styles.featureItem}
+                onClick={handleGenerateAudio}
                 disabled={isGeneratingAudio || selectedSourceIds.length === 0}
                 title={selectedSourceIds.length === 0 ? "Select at least one source" : "Generate Audio"}
               >
@@ -564,24 +687,15 @@ export default function Home() {
                   {isGeneratingAudio ? <Loader2 size={20} className={styles.spin} /> : <Headphones size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>{audioUrl ? 'Open Audio' : 'Audio Overview'}</span>
-                  <span className={styles.featureDesc}>{audioUrl ? 'Ready to listen' : 'Listen to sources'}</span>
+                  <span className={styles.featureName}>Audio Overview</span>
+                  <span className={styles.featureDesc}>{isGeneratingAudio ? audioGenerationStatus : 'Listen to sources'}</span>
                 </div>
               </button>
 
               {/* --- SUMMARY BUTTON --- */}
               <button
-                className={`${styles.featureItem} ${summaryContent ? styles.successBorder : ''}`}
-                onClick={() => {
-                  if (summaryContent) {
-                    // Open summary in a new tab as a blob
-                    const blob = new Blob([summaryContent], { type: 'text/markdown' });
-                    const url = URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                  } else {
-                    handleGenerateSummary();
-                  }
-                }}
+                className={styles.featureItem}
+                onClick={handleGenerateSummary}
                 disabled={isGeneratingSummary || selectedSourceIds.length === 0}
                 title={selectedSourceIds.length === 0 ? "Select at least one source" : "Generate Summary"}
               >
@@ -589,21 +703,15 @@ export default function Home() {
                   {isGeneratingSummary ? <Loader2 size={20} className={styles.spin} /> : <FileBarChart size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>{summaryContent ? 'View Summary' : 'Summary'}</span>
-                  <span className={styles.featureDesc}>{summaryContent ? 'Ready to read' : 'One-page report'}</span>
+                  <span className={styles.featureName}>Summary</span>
+                  <span className={styles.featureDesc}>{isGeneratingSummary ? 'Generating...' : 'One-page report'}</span>
                 </div>
               </button>
 
               {/* --- SLIDES BUTTON --- */}
               <button
-                className={`${styles.featureItem} ${slideUrl ? styles.successBorder : ''}`}
-                onClick={() => {
-                  if (slideUrl) {
-                    window.open(slideUrl, '_blank');
-                  } else {
-                    handleGenerateSlides();
-                  }
-                }}
+                className={styles.featureItem}
+                onClick={handleGenerateSlides}
                 disabled={isGeneratingSlides || sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id)).length === 0}
                 title={sources.filter(s => s.type === 'pdf' && selectedSourceIds.includes(s.id)).length === 0 ? "Select at least one PDF source" : "Generate Slides"}
               >
@@ -611,14 +719,161 @@ export default function Home() {
                   {isGeneratingSlides ? <Loader2 size={20} className={styles.spin} /> : <Presentation size={20} />}
                 </div>
                 <div className={styles.featureInfo}>
-                  <span className={styles.featureName}>{slideUrl ? 'Open Slides' : 'Slides Generator'}</span>
-                  <span className={styles.featureDesc}>{slideUrl ? 'Ready to present' : 'Turn PDFs into slides'}</span>
+                  <span className={styles.featureName}>Slides Generator</span>
+                  <span className={styles.featureDesc}>{isGeneratingSlides ? 'Generating...' : 'Turn PDFs into interactive deck'}</span>
                 </div>
               </button>
             </div>
+
+            {/* --- ARTIFACTS SECTION --- */}
+            {artifacts.length > 0 && (
+              <div className={styles.artifactsSection}>
+                <div className={styles.artifactsSectionTitle}>
+                  <Package size={16} />
+                  <span>Artifacts ({artifacts.length})</span>
+                </div>
+                <div className={styles.artifactsList}>
+                  {artifacts.map(artifact => (
+                    <button
+                      key={artifact.id}
+                      className={styles.artifactCard}
+                      onClick={() => {
+                        if (artifact.url || artifact.content) {
+                          setActiveModal({ type: artifact.type, artifact });
+                        }
+                      }}
+                    >
+                      <div className={styles.artifactIcon}>
+                        {artifact.type === 'audio' && <Headphones size={14} />}
+                        {artifact.type === 'summary' && <FileBarChart size={14} />}
+                        {artifact.type === 'slides' && <Presentation size={14} />}
+                      </div>
+                      <div className={styles.artifactInfo}>
+                        <span className={styles.artifactName}>{artifact.label}</span>
+                        <span className={styles.artifactTime}>
+                          {new Date(artifact.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </>
         )}
       </aside>
+
+      {/* ===== AUDIO MODAL ===== */}
+      {activeModal?.type === 'audio' && activeModal.artifact.url && (
+        <div className={styles.modalOverlay} onClick={closeModal}>
+          <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalClose} onClick={closeModal}>
+              <X size={20} />
+            </button>
+            <h2 className={styles.modalTitle}>
+              <Headphones size={22} /> {activeModal.artifact.label}
+            </h2>
+
+            <audio ref={audioRef} src={activeModal.artifact.url} preload="metadata" />
+
+            <div className={styles.audioPlayerModal}>
+              <button className={styles.playPauseButton} onClick={togglePlayPause}>
+                {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+              </button>
+
+              <div className={styles.audioProgress} onClick={handleSeek}>
+                <div
+                  className={styles.audioProgressFill}
+                  style={{ width: duration ? `${(currentTime / duration) * 100}%` : '0%' }}
+                />
+              </div>
+
+              <div className={styles.audioTime}>
+                <span>{formatTime(currentTime)}</span>
+                <span>/</span>
+                <span>{formatTime(duration)}</span>
+              </div>
+
+              <Volume2 size={18} className={styles.volumeIcon} />
+            </div>
+
+            {activeModal.artifact.script && (
+              <>
+                <button
+                  className={styles.transcriptToggle}
+                  onClick={() => setShowTranscript(!showTranscript)}
+                >
+                  <span>Transcript</span>
+                  {showTranscript ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+                {showTranscript && (
+                  <div className={styles.transcriptContent}>
+                    {activeModal.artifact.script}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===== SUMMARY MODAL ===== */}
+      {activeModal?.type === 'summary' && activeModal.artifact.content && (
+        <div className={styles.modalOverlay} onClick={closeModal}>
+          <div className={`${styles.modalContent} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalClose} onClick={closeModal}>
+              <X size={20} />
+            </button>
+            <h2 className={styles.modalTitle}>
+              <FileBarChart size={22} /> {activeModal.artifact.label}
+            </h2>
+            <div className={styles.summaryBody}>
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+              >
+                {activeModal.artifact.content}
+              </ReactMarkdown>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== SLIDES MODAL ===== */}
+      {activeModal?.type === 'slides' && activeModal.artifact.url && (
+        <div className={styles.modalOverlay} onClick={closeModal}>
+          <div className={`${styles.modalContent} ${styles.modalFullscreen}`} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalClose} onClick={closeModal} title="Close Slides">
+              <X size={20} />
+            </button>
+            
+            <div className={styles.iframeHeader}>
+              <h2 className={styles.modalTitle} style={{ margin: 0, padding: 0 }}>
+                <Presentation size={22} /> {activeModal.artifact.label}
+              </h2>
+              <span className={styles.iframeHint}>
+                Press <strong>F</strong> or double-click to enter Fullscreen
+              </span>
+            </div>
+
+            <div className={styles.iframeContainer}>
+              <iframe 
+                src={activeModal.artifact.url} 
+                className={styles.slidesIframe} 
+                allowFullScreen
+                title="Slides Viewer"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== TOAST NOTIFICATION ===== */}
+      {toast && (
+        <div className={`${styles.toast} ${styles[`toast${toast.type.charAt(0).toUpperCase() + toast.type.slice(1)}`]}`}>
+          {toast.message}
+        </div>
+      )}
     </div>
   );
 }

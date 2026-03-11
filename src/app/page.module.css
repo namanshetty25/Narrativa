@@ -8,8 +8,6 @@
 .sidebar {
   height: 100%;
   background: var(--bg-panel);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
   display: flex;
   flex-direction: column;
   padding: 1.25rem;
@@ -258,8 +256,8 @@
   width: 38px;
   height: 38px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
-  color: #a78bfa;
+  background: rgba(138, 180, 248, 0.1);
+  color: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,9 +318,10 @@
   align-items: flex-end;
   background: var(--bg-input);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.5rem;
+  border-radius: var(--radius-lg);
+  padding: 0.5rem 0.5rem 0.5rem 1rem;
   transition: all 0.2s ease;
+  box-shadow: var(--shadow-floating);
 }
 
 .chatInputBox:focus-within {
@@ -386,36 +385,40 @@
 }
 
 .user {
-  background: rgba(59, 130, 246, 0.08);
+  background: var(--bg-input);
   margin-left: auto;
-  border: 1px solid rgba(59, 130, 246, 0.15);
-}
-
-.ai {
-  background: rgba(255, 255, 255, 0.02);
-  margin-right: auto;
   border: 1px solid var(--border);
 }
 
+.ai {
+  background: transparent;
+  margin-right: auto;
+  border: none;
+  padding-left: 0;
+  padding-right: 0;
+  max-width: 100%;
+}
+
 .messageAvatar {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }
 
 .user .messageAvatar {
   background: var(--accent);
-  color: #fff;
+  color: var(--bg-app);
 }
 
 .ai .messageAvatar {
-  background: var(--bg-hover);
+  background: transparent;
   color: var(--accent);
+  border: 1px solid var(--border);
 }
 
 .messageContent {
@@ -598,8 +601,8 @@
   width: 100%;
   padding: 0.85rem 1rem;
   border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-  color: #fff;
+  background: var(--accent);
+  color: var(--bg-app);
   font-weight: 500;
   font-size: 0.9rem;
   display: flex;
@@ -625,8 +628,9 @@
 .generateAudioButton:hover::before { left: 100%; }
 
 .generateAudioButton:hover {
+  background: var(--accent-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+  box-shadow: var(--shadow-elevated);
 }
 
 .generateAudioButton:disabled {
@@ -844,6 +848,51 @@
   width: 600px;
 }
 
+/* ==================== SLIDES MODAL ==================== */
+.modalFullscreen {
+  width: 90vw;
+  height: 90vh;
+  max-width: 1400px;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+}
+
+.iframeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-right: 2.5rem; /* Room for close button */
+}
+
+.iframeHint {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+}
+
+.iframeHint strong {
+  color: var(--accent);
+}
+
+.iframeContainer {
+  flex: 1;
+  width: 100%;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--border);
+}
+
+.slidesIframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
 .summaryReport {
   display: flex;
   flex-direction: column;
@@ -995,8 +1044,259 @@
 
 .sourceCheckbox {
   margin-right: 0.5rem;
-  accent-color: #3b82f6;
   width: 16px;
   height: 16px;
   cursor: pointer;
 }
+
+/* ==================== TOAST ==================== */
+.toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.8rem 1.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #fff;
+  z-index: 9999;
+  animation: toastFade 3.5s ease-in-out forwards;
+  box-shadow: var(--shadow-floating);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.toastError {
+  background: #ea4335; /* Google Material Red */
+}
+
+.toastSuccess {
+  background: #34a853; /* Google Material Green */
+}
+
+.toastInfo {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  color: var(--text-main);
+}
+
+@keyframes toastFade {
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  10% { opacity: 1; transform: translate(-50%, 0); }
+  90% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 20px); }
+}
+
+/* ==================== MODAL ==================== */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 5000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.modalContent {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem;
+  width: 480px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: var(--shadow-floating);
+  animation: modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.modalWide {
+  width: 640px;
+}
+
+.modalClose {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.modalClose:hover {
+  background: var(--bg-hover);
+  color: var(--text-main);
+}
+
+.modalTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 1.25rem;
+}
+
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ==================== AUDIO PLAYER MODAL ==================== */
+.audioPlayerModal {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  border: 1px solid var(--border);
+}
+
+.playPauseButton {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--bg-app);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.playPauseButton:hover {
+  background: var(--accent-hover);
+  transform: scale(1.05);
+}
+
+.audioProgress {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-hover);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.audioProgressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.audioTime {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.volumeIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+/* ==================== ARTIFACTS SECTION ==================== */
+.artifactsSection {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.artifactsSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.75rem;
+}
+
+.artifactsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.artifactCard {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  text-align: left;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  width: 100%;
+}
+
+.artifactCard:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-focus);
+}
+
+.artifactIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(138, 180, 248, 0.1);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.artifactInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.artifactName {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.artifactTime {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+/* ==================== SOURCE LABEL ==================== */
+.sourceLabel {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.78rem;
+  margin-right: 0.25rem;
+}
+

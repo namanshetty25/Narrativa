@@ -14,9 +14,21 @@ export type DocumentChunk = {
   text: string;
 };
 
+export type Artifact = {
+  id: string;
+  type: 'audio' | 'summary' | 'slides';
+  label: string;
+  sourceIds: string[];
+  url?: string;
+  content?: string;
+  script?: string;
+  timestamp: number;
+};
+
 type StoreData = {
   sources: Source[];
   chunks: DocumentChunk[];
+  artifacts: Artifact[];
 };
 
 const DATA_DIR = path.join(process.cwd(), '.data');
@@ -31,12 +43,15 @@ export function loadStore(): StoreData {
   try {
     if (fs.existsSync(DATA_FILE)) {
       const data = fs.readFileSync(DATA_FILE, 'utf-8');
-      return JSON.parse(data) as StoreData;
+      const parsed = JSON.parse(data) as StoreData;
+      // Ensure backwards compatibility with old stores
+      if (!parsed.artifacts) parsed.artifacts = [];
+      return parsed;
     }
   } catch (error) {
     console.error("Failed to load store", error);
   }
-  return { sources: [], chunks: [] };
+  return { sources: [], chunks: [], artifacts: [] };
 }
 
 export function saveStore(data: StoreData) {
@@ -51,6 +66,8 @@ export function deleteSourceAndChunks(id: string) {
   const store = loadStore();
   store.sources = store.sources.filter(s => s.id !== id);
   store.chunks = store.chunks.filter(c => c.sourceId !== id);
+  // Also clean up artifacts that rely on this source
+  store.artifacts = store.artifacts.filter(a => !a.sourceIds.includes(id));
   saveStore(store);
 }
 
@@ -90,4 +107,20 @@ export function addSourceAndChunks(source: Source): { source: Source; chunks: Do
   saveStore(store);
   
   return { source, chunks };
+}
+
+export function saveArtifact(artifact: Artifact) {
+  const store = loadStore();
+  // Check if an artifact with this ID already exists, replace it if so
+  const existingIndex = store.artifacts.findIndex(a => a.id === artifact.id);
+  if (existingIndex >= 0) {
+    store.artifacts[existingIndex] = artifact;
+  } else {
+    store.artifacts.push(artifact);
+  }
+  saveStore(store);
+}
+
+export function getArtifacts(): Artifact[] {
+  return loadStore().artifacts;
 }

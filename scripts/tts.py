@@ -1,13 +1,23 @@
 """
-Text-to-Speech script using gTTS.
+Text-to-Speech script using edge-tts.
 Reads text from stdin, outputs MP3 to the specified file path.
+Provides higher quality and better reliability than gTTS.
 
 Usage: python scripts/tts.py <output_file_path>
 """
 
 import sys
 import os
-from gtts import gTTS
+import asyncio
+import edge_tts
+
+
+async def generate_speech(text, output_path):
+    # Standard high-quality voice
+    VOICE = "en-US-AvaNeural"
+    
+    communicate = edge_tts.Communicate(text, VOICE)
+    await communicate.save(output_path)
 
 
 def main():
@@ -27,12 +37,14 @@ def main():
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Generate speech using gTTS
-    tts = gTTS(text=text, lang='en', slow=False)
-    tts.save(output_path)
-
-    # Print the output path so Node.js can read it
-    print(output_path)
+    try:
+        # Run the async TTS generation
+        asyncio.run(generate_speech(text, output_path))
+        # Print the output path so Node.js can read it
+        print(output_path)
+    except Exception as e:
+        print(f"Error during TTS generation: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

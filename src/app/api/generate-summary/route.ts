@@ -4,10 +4,10 @@ import { loadStore } from '@/lib/store';
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY not set.' },
+        { error: 'GOOGLE_API_KEY not set.' },
         { status: 500 }
       );
     }

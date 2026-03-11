@@ -11,10 +11,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid messages format' }, { status: 400 });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GOOGLE_API_KEY;
     if (!apiKey) {
       return NextResponse.json({
-        error: 'GEMINI_API_KEY environment variable is not set. Please add it to .env.local.'
       }, { status: 500 });
     }
 

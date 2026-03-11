@@ -1,0 +1,191 @@
+/* deck.module.css */
+
+.deckWrapper {
+  width: 100vw;
+  height: 100vh;
+  background-color: #f7fafc; /* Match python default bg */
+  color: #333;
+  overflow: hidden;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+/* Override Reveal defaults gently to fit our 1920x1080 slide ratio natively */
+.narrativaSlide {
+  height: 100% !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-sizing: border-box;
+}
+
+.titleBanner {
+  background-color: var(--h-color, #1a365d);
+  color: white;
+  width: 100%;
+  padding: 2rem 0;
+  text-align: center;
+  border-bottom: 6px solid #2b6cb0;
+}
+
+.titleBanner h1 {
+  margin: 0;
+  color: white !important; /* Force reveal override */
+  font-size: 3.5rem;
+  font-weight: 700;
+  text-transform: none !important;
+}
+
+.slideBody {
+  flex: 1;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+  padding: 3rem;
+}
+
+.slideContainer {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  box-sizing: border-box;
+}
+
+/* LAYOUTS */
+.textOnlyLayout {
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.splitLayout {
+  display: flex;
+  flex-direction: row;
+  gap: 3rem;
+  align-items: stretch;
+}
+
+.leftHalf, .rightHalf {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+
+.imageHalf {
+  justify-content: center;
+  align-items: center;
+}
+
+.imgLarge {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.imgMedium {
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+}
+
+/* Full Image text overlay */
+.fullImageLayout {
+  position: relative;
+  overflow: hidden;
+}
+
+.fullImageBg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.3; /* Wash it out slightly so text is readable */
+}
+
+.overlayContent {
+  position: relative;
+  z-index: 1;
+  padding: 4rem;
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  max-width: 80%;
+  margin: auto;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+/* Markdown Typography Overrides inside Reveal */
+.contentBlock {
+  font-size: 2rem;
+  line-height: 1.5;
+  color: #4a5568;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.contentBlock h1 {
+  font-size: 3rem;
+  color: var(--h-color, #1a365d);
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+  text-transform: none !important;
+  text-align: left;
+}
+
+.contentBlock h2 {
+  font-size: 2.2rem;
+  color: #2c5282;
+  margin-bottom: 1rem;
+  font-weight: 600;
+  text-transform: none !important;
+  text-align: left;
+}
+
+.contentBlock ul, .contentBlock ol {
+  padding-left: 2.5rem;
+  text-align: left;
+}
+
+.contentBlock li {
+  margin-bottom: 0.8rem;
+}
+
+/* Markdown Tables */
+.contentBlock table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1.6rem;
+  margin-top: 2rem;
+}
+
+.contentBlock th {
+  background-color: var(--h-color, #1a365d);
+  color: white;
+  padding: 1rem;
+  text-align: left;
+}
+
+.contentBlock td {
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.contentBlock tr:nth-child(even) {
+  background-color: #edf2f7;
+}
+
+/* Remove typical reveal margins that mess up our grid */
+.reveal section h1,
+.reveal section h2,
+.reveal section p,
+.reveal section ul,
+.reveal section ol {
+  margin-bottom: inherit;
+}

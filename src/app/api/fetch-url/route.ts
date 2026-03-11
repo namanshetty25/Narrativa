@@ -47,23 +47,30 @@ export async function POST(req: NextRequest) {
         }
 
         // 2. Fetch Transcript via Python Helper (Robust)
-        const { execSync } = await import("child_process");
+        const { exec } = await import("child_process");
         const path = await import("path");
         
-        const pythonPath = path.join(process.cwd(), ".venv/bin/python");
+        const pythonPath = path.join(process.cwd(), ".venv", process.platform === "win32" ? "Scripts" : "bin", process.platform === "win32" ? "python.exe" : "python");
         const scriptPath = path.join(process.cwd(), "scripts/youtube_transcript.py");
         
         console.log(`🎬 Fetching transcript for ${videoId} using Python helper...`);
         
         try {
-          text = execSync(`${pythonPath} ${scriptPath} ${videoId}`, { 
-            encoding: "utf8",
-            timeout: 30000 // 30s timeout
+          text = await new Promise<string>((resolve, reject) => {
+            exec(`"${pythonPath}" "${scriptPath}" "${videoId}"`, { 
+              encoding: "utf8",
+              timeout: 30000 // 30s timeout
+            }, (error, stdout, stderr) => {
+              if (error) {
+                reject(new Error(`Transcript extraction failed: ${stderr || error.message}`));
+              } else {
+                resolve(stdout);
+              }
+            });
           });
         } catch (execError: any) {
-          const stderr = execError.stderr?.toString() || "";
-          console.error("Python Helper Error:", stderr);
-          throw new Error(`Transcript extraction failed: ${stderr || execError.message}`);
+          console.error("Python Helper Error:", execError.message);
+          throw execError;
         }
 
         if (!text || !text.trim()) {

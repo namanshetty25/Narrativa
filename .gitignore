@@ -63,6 +63,7 @@ dist/
 # Output directories (slide_generator)
 *_slides/
 output*/
+/public/slides/
 
 # SAM3 model weights
 sam3/

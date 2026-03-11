@@ -37,7 +37,7 @@ def get_sam3_processor():
     try:
         import torch
         if not torch.cuda.is_available():
-            print("⚠️  GPU unavailable: SAM3 disabled (will use crop fallback)")
+            print("[WARNING] GPU unavailable: SAM3 disabled (will use crop fallback)")
             return None
 
         from sam3.model_builder import build_sam3_image_model
@@ -45,7 +45,7 @@ def get_sam3_processor():
 
         BPE_PATH = os.path.join(os.path.dirname(__file__), "sam3", "sam3", "assets", "bpe_simple_vocab_16e6.txt.gz")
         if not os.path.exists(BPE_PATH):
-            print(f"⚠️  SAM3 BPE file not found at {BPE_PATH}: SAM3 disabled")
+            print(f"[WARNING] SAM3 BPE file not found at {BPE_PATH}: SAM3 disabled")
             return None
 
         device = "cuda"
@@ -55,5 +55,5 @@ def get_sam3_processor():
         return Sam3Processor(sam3_model, confidence_threshold=0.5)
 
     except ImportError:
-        print("⚠️  SAM3/PyTorch not installed: SAM3 disabled")
+        print("[WARNING] SAM3/PyTorch not installed: SAM3 disabled")
         return None

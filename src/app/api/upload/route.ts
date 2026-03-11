@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
 
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
       // Use Gemini to extract text from PDFs — much more robust than any parser
-      const apiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.GOOGLE_API_KEY;
       if (!apiKey) {
-        return NextResponse.json({ error: 'GEMINI_API_KEY not set. Cannot process PDFs.' }, { status: 500 });
+        return NextResponse.json({ error: 'GOOGLE_API_KEY not set. Cannot process PDFs.' }, { status: 500 });
       }
 
       const ai = new GoogleGenAI({ apiKey });

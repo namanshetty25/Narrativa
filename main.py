@@ -61,7 +61,7 @@ Examples:
 
     # Run the pipeline
     print()
-    print("🎨 PDF-to-Slides Pipeline")
+    print("PDF-to-Slides Pipeline")
     print("=" * 40)
     run_pipeline(args.pdf, args.output, page_range)
 

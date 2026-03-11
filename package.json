@@ -19,12 +19,14 @@
     "react-markdown": "^10.1.0",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
-    "remark-math": "^6.0.0"
+    "remark-math": "^6.0.0",
+    "reveal.js": "^5.2.1"
   },
   "devDependencies": {
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/reveal.js": "^5.2.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "typescript": "^5"
