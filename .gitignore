@@ -73,3 +73,5 @@ sam3/
 .idea/
 *.swp
 *.swo
+
+/src/generated/prisma

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { loadStore } from '@/lib/store';
+import { getChunks } from '@/lib/store';
 
 export async function POST(req: Request) {
   try {
@@ -14,11 +14,7 @@ export async function POST(req: Request) {
 
     const { selectedSourceIds } = await req.json().catch(() => ({ selectedSourceIds: [] }));
 
-    const store = loadStore();
-    let availableChunks = store.chunks;
-    if (selectedSourceIds && selectedSourceIds.length > 0) {
-      availableChunks = availableChunks.filter(c => selectedSourceIds.includes(c.sourceId));
-    }
+    const availableChunks = await getChunks('', selectedSourceIds);
 
     if (availableChunks.length === 0) {
       return NextResponse.json(
@@ -27,9 +23,8 @@ export async function POST(req: Request) {
       );
     }
 
-    // Gather all source content
     const allContent = availableChunks
-      .map((c, i) => `[Section ${i + 1}]\n${c.text}`)
+      .map((c: { text: string }, i: number) => `[Section ${i + 1}]\n${c.text}`)
       .join('\n\n---\n\n');
 
     const cappedContent = allContent.slice(0, 40000);
@@ -81,10 +76,11 @@ ${cappedContent}`,
       success: true,
       summary,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Summary generation error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

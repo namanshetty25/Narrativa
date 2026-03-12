@@ -1300,3 +1300,319 @@
   margin-right: 0.25rem;
 }
 
+/* ==================== NEW CHAT BUTTON ==================== */
+.newChatButton {
+  width: 100%;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(138, 180, 248, 0.15), rgba(167, 139, 250, 0.15));
+  border: 1px solid rgba(138, 180, 248, 0.25);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.newChatButton:hover {
+  background: linear-gradient(135deg, rgba(138, 180, 248, 0.25), rgba(167, 139, 250, 0.25));
+  border-color: var(--accent);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(138, 180, 248, 0.2);
+}
+
+.newChatButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ==================== HISTORY SECTION ==================== */
+.historySection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  max-height: 200px;
+}
+
+.historySectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.historyList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.historyItem {
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.historyItem:hover {
+  background: var(--bg-hover);
+  border-color: var(--border);
+}
+
+.historyItemActive {
+  background: rgba(138, 180, 248, 0.08) !important;
+  border-color: rgba(138, 180, 248, 0.25) !important;
+}
+
+.historyItemContent {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.historyItemTitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.historyItemTime {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.historyDeleteButton {
+  opacity: 0;
+  color: var(--text-muted);
+  padding: 0.2rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.historyItem:hover .historyDeleteButton {
+  opacity: 1;
+}
+
+.historyDeleteButton:hover {
+  color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* ==================== RESEARCH REPORT SECTION ==================== */
+.researchSection {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.researchSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.researchDesc {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.researchInputWrapper {
+  display: flex;
+  align-items: center;
+  background-color: var(--bg-input);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  transition: border-color 0.2s;
+}
+
+.researchInputWrapper:focus-within {
+  border-color: rgba(167, 139, 250, 0.5);
+}
+
+.researchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.6rem 0.5rem 0.6rem 0.75rem;
+  color: var(--text-main);
+  font-size: 0.8rem;
+  outline: none;
+}
+
+.researchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.researchGenerateButton {
+  background: transparent;
+  border: none;
+  color: #a78bfa;
+  padding: 0 0.7rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.researchGenerateButton:hover:not(:disabled) {
+  background-color: rgba(167, 139, 250, 0.1);
+}
+
+.researchGenerateButton:disabled {
+  color: var(--text-muted);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.researchStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  color: #a78bfa;
+  padding: 0.4rem 0;
+}
+
+.reportsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+}
+
+.reportCard {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid var(--border);
+  text-align: left;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  width: 100%;
+  color: #a78bfa;
+}
+
+.reportCard:hover {
+  background: var(--bg-hover);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.reportCardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.reportCardTitle {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reportCardTime {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* ==================== REPORT MODAL PAPERS ==================== */
+.reportPapers {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.reportPapersTitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.reportPapersList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.reportPaperLink {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  background: rgba(167, 139, 250, 0.05);
+  border: 1px solid rgba(167, 139, 250, 0.15);
+  color: var(--accent);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.reportPaperLink:hover {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.reportPaperLink span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.reportPaperLink svg {
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+  color: #a78bfa;
+}
+

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { loadStore } from '@/lib/store';
+import { getChunks } from '@/lib/store';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
@@ -19,12 +19,11 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const pythonScript = path.join(process.cwd(), 'scripts', 'tts.py');
 
-    // Use the virtual environment Python
-    const pythonExecutable = path.join(process.cwd(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
+    const pythonExecutable = path.join(process.cwd(), '.' + 'venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
     const proc = spawn(pythonExecutable, [pythonScript, outputPath], {
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-      timeout: 120000, // 2 minutes for TTS only
+      timeout: 120000,
     });
 
     let stderr = '';
@@ -45,7 +44,6 @@ function runTTS(scriptText: string, outputPath: string): Promise<void> {
       reject(new Error(`Failed to start TTS process: ${err.message}`));
     });
 
-    // Write script text to stdin and close it
     proc.stdin.write(scriptText);
     proc.stdin.end();
   });
@@ -63,12 +61,8 @@ export async function POST(req: Request) {
 
     const { selectedSourceIds } = await req.json().catch(() => ({ selectedSourceIds: [] }));
 
-    // 1. Load all source texts
-    const store = loadStore();
-    let availableChunks = store.chunks;
-    if (selectedSourceIds && selectedSourceIds.length > 0) {
-      availableChunks = availableChunks.filter(c => selectedSourceIds.includes(c.sourceId));
-    }
+    // Load chunks from database
+    const availableChunks = await getChunks('', selectedSourceIds);
 
     if (availableChunks.length === 0) {
       return NextResponse.json(
@@ -77,15 +71,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Gather source content (use chunks for better context)
     const allContent = availableChunks
-      .map((c, i) => `[Section ${i + 1}]\n${c.text}`)
+      .map((c: { text: string }, i: number) => `[Section ${i + 1}]\n${c.text}`)
       .join('\n\n---\n\n');
 
-    // Cap the content to avoid token limits (~40k chars)
     const cappedContent = allContent.slice(0, 40000);
 
-    // 2. Generate narrator script via Gemini
     console.log('🎙️ Generating narrator script via Gemini...');
     const ai = new GoogleGenAI({ apiKey });
 
@@ -133,13 +124,11 @@ ${cappedContent}`,
 
     console.log(`✅ Script generated (${script.length} chars). Converting to audio via gTTS...`);
 
-    // 3. Generate audio using gTTS (Python)
     const audioId = crypto.randomUUID();
     const audioFilePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
 
     await runTTS(script, audioFilePath);
 
-    // Verify the audio file was created
     if (!fs.existsSync(audioFilePath)) {
       return NextResponse.json(
         { error: 'Audio generation failed — file not created.' },
@@ -156,12 +145,12 @@ ${cappedContent}`,
       audioUrl: `/api/audio/${audioId}`,
       script,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Audio generation error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
 }
-

@@ -1,22 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { addSourceAndChunks, loadStore, saveStore } from '@/lib/store';
+import { addSourceAndChunks } from '@/lib/store';
 import { generateEmbeddings } from '@/lib/embeddings';
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File;
+    const sessionId = formData.get('sessionId') as string;
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+    }
+    if (!sessionId) {
+      return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     let text = '';
 
     if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      // Use Gemini to extract text from PDFs — much more robust than any parser
       const apiKey = process.env.GOOGLE_API_KEY;
       if (!apiKey) {
         return NextResponse.json({ error: 'GOOGLE_API_KEY not set. Cannot process PDFs.' }, { status: 500 });
@@ -47,7 +50,6 @@ export async function POST(req: NextRequest) {
 
       text = response.text ?? '';
     } else {
-      // Plain text, markdown, etc.
       text = buffer.toString('utf-8');
     }
 
@@ -55,8 +57,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 400 });
     }
 
-    // Add source and create chunks
-    const { source, chunks } = addSourceAndChunks({
+    // Add source and create chunks (now linked to session)
+    const { source, chunks } = await addSourceAndChunks(sessionId, {
       id: crypto.randomUUID(),
       name: file.name,
       type: file.name.endsWith('.pdf') ? 'pdf' : 'txt',
@@ -79,7 +81,6 @@ export async function POST(req: NextRequest) {
       const chunkTexts = chunks.map((c: { text: string }) => c.text);
       const embeddings = await generateEmbeddings(chunkTexts);
 
-      // Add embeddings directly to the fast local FAISS database
       const { addVectors } = await import('@/lib/vector-store');
       const chunkIds = chunks.map((c: { id: string }) => c.id);
       addVectors(embeddings, chunkIds);
@@ -90,8 +91,9 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, source: { id: source.id, name: source.name, type: source.type } });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Upload Error:', error);
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

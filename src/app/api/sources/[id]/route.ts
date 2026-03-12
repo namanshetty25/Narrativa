@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadStore, saveStore, deleteSourceAndChunks } from '@/lib/store';
+import { deleteSourceAndChunks } from '@/lib/store';
 
 export async function DELETE(
   _req: NextRequest,
@@ -7,12 +7,10 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    
-    // Deletes both the source definition and the chunk FSS files
-    deleteSourceAndChunks(id);
-    
+    await deleteSourceAndChunks(id);
     return NextResponse.json({ success: true });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

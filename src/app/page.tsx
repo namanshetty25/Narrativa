@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart, Link as LinkIcon, Package } from 'lucide-react';
+import { Plus, FileText, Send, Loader2, Sparkles, User, Trash2, Headphones, Play, Pause, Volume2, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, X, Presentation, FileBarChart, Link as LinkIcon, Package, MessageSquarePlus, Clock, Search, BookOpen, SquarePen } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
@@ -30,9 +30,26 @@ type Artifact = {
   timestamp: number;
 };
 
+type SessionListItem = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  _count: { messages: number };
+};
+
+type ResearchReport = {
+  id: string;
+  topic: string;
+  content: string;
+  papers: { title: string; url: string }[];
+  createdAt: string;
+};
+
 type ActiveModal = {
-  type: 'audio' | 'summary' | 'slides';
-  artifact: Artifact;
+  type: 'audio' | 'summary' | 'slides' | 'report';
+  artifact?: Artifact;
+  report?: ResearchReport;
 } | null;
 
 function formatTime(seconds: number): string {
@@ -42,7 +59,29 @@ function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 export default function Home() {
+  // ===== SESSION STATE =====
+  const [sessions, setSessions] = useState<SessionListItem[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+
+  // ===== EXISTING STATE =====
   const [sources, setSources] = useState<Source[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'ai', content: 'Welcome to **Narrativa**! Upload your documents using the sidebar, then ask me anything about them. I\'ll answer based strictly on your sources.' }
@@ -65,6 +104,11 @@ export default function Home() {
   const [audioGenerationStatus, setAudioGenerationStatus] = useState('');
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingSlides, setIsGeneratingSlides] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  // Research report
+  const [reportTopic, setReportTopic] = useState('');
+  const [reports, setReports] = useState<ResearchReport[]>([]);
 
   // Audio player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -83,6 +127,106 @@ export default function Home() {
   const showToast = (message: string, type: 'error' | 'success' | 'info' = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  // ===== SESSION MANAGEMENT =====
+
+  // Load sessions on mount
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const loadSessions = async () => {
+    try {
+      setIsLoadingSessions(true);
+      const res = await fetch('/api/sessions');
+      const data = await res.json();
+      if (data.sessions) {
+        setSessions(data.sessions);
+        // Auto-select the most recent session if no active session
+        if (data.sessions.length > 0 && !activeSessionId) {
+          await loadSession(data.sessions[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load sessions', err);
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
+  const loadSession = async (sessionId: string) => {
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}`);
+      const data = await res.json();
+      if (data.session) {
+        setActiveSessionId(sessionId);
+        setSources(data.session.sources || []);
+        setSelectedSourceIds([]);
+        setArtifacts(data.session.artifacts || []);
+        setReports(data.session.reports || []);
+
+        if (data.session.messages && data.session.messages.length > 0) {
+          setMessages(data.session.messages);
+        } else {
+          setMessages([
+            { role: 'ai', content: 'Welcome to **Narrativa**! Upload your documents using the sidebar, then ask me anything about them. I\'ll answer based strictly on your sources.' }
+          ]);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load session', err);
+    }
+  };
+
+  const handleNewChat = async () => {
+    if (isCreatingSession) return;
+    setIsCreatingSession(true);
+    try {
+      const res = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      const data = await res.json();
+      if (data.sessionId) {
+        setActiveSessionId(data.sessionId);
+        setSources([]);
+        setSelectedSourceIds([]);
+        setArtifacts([]);
+        setReports([]);
+        setMessages([
+          { role: 'ai', content: 'Welcome to **Narrativa**! Upload your documents using the sidebar, then ask me anything about them. I\'ll answer based strictly on your sources.' }
+        ]);
+        // Reload sessions list
+        const sessRes = await fetch('/api/sessions');
+        const sessData = await sessRes.json();
+        if (sessData.sessions) setSessions(sessData.sessions);
+      }
+    } catch (err) {
+      console.error('Failed to create session', err);
+      showToast('Failed to create new chat', 'error');
+    } finally {
+      setIsCreatingSession(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+      setSessions(prev => prev.filter(s => s.id !== sessionId));
+      if (activeSessionId === sessionId) {
+        const remaining = sessions.filter(s => s.id !== sessionId);
+        if (remaining.length > 0) {
+          await loadSession(remaining[0].id);
+        } else {
+          await handleNewChat();
+        }
+      }
+    } catch (err) {
+      console.error('Failed to delete session', err);
+    }
   };
 
   // Helper: build a human-readable label from selected source indices
@@ -109,25 +253,6 @@ export default function Home() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Load sources and artifacts on mount
-  useEffect(() => {
-    // Load sources
-    fetch('/api/sources')
-      .then(res => res.json())
-      .then(data => {
-        if (data.sources) setSources(data.sources);
-      })
-      .catch(err => console.error("Failed to load sources", err));
-
-    // Load persisted artifacts
-    fetch('/api/artifacts')
-      .then(res => res.json())
-      .then(data => {
-        if (data.artifacts) setArtifacts(data.artifacts);
-      })
-      .catch(err => console.error("Failed to load artifacts", err));
-  }, []);
 
   // Audio time update
   useEffect(() => {
@@ -157,7 +282,6 @@ export default function Home() {
   const handleGenerateAudio = async () => {
     if (isGeneratingAudio || selectedSourceIds.length === 0) return;
 
-    // Check for existing artifact
     const existing = findExistingArtifact('audio', selectedSourceIds);
     if (existing) {
       setActiveModal({ type: 'audio', artifact: existing });
@@ -195,12 +319,12 @@ export default function Home() {
           script: data.script,
           timestamp: Date.now(),
         };
-        
-        // Save globally
+
+        // Save to database
         await fetch('/api/artifacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(artifact)
+          body: JSON.stringify({ ...artifact, sessionId: activeSessionId })
         });
 
         setArtifacts(prev => [...prev, artifact]);
@@ -239,7 +363,6 @@ export default function Home() {
   const handleGenerateSummary = async () => {
     if (isGeneratingSummary || selectedSourceIds.length === 0) return;
 
-    // Check for existing artifact
     const existing = findExistingArtifact('summary', selectedSourceIds);
     if (existing) {
       setActiveModal({ type: 'summary', artifact: existing });
@@ -266,11 +389,10 @@ export default function Home() {
           timestamp: Date.now(),
         };
 
-        // Save globally
         await fetch('/api/artifacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(artifact)
+          body: JSON.stringify({ ...artifact, sessionId: activeSessionId })
         });
 
         setArtifacts(prev => [...prev, artifact]);
@@ -292,7 +414,6 @@ export default function Home() {
 
     const source = selectedPdfs[0];
 
-    // Check for existing artifact
     const existing = findExistingArtifact('slides', [source.id]);
     if (existing && existing.url) {
       window.open(existing.url, '_blank');
@@ -319,11 +440,10 @@ export default function Home() {
           timestamp: Date.now(),
         };
 
-        // Save globally
         await fetch('/api/artifacts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(artifact)
+          body: JSON.stringify({ ...artifact, sessionId: activeSessionId })
         });
 
         setArtifacts(prev => [...prev, artifact]);
@@ -339,13 +459,65 @@ export default function Home() {
     }
   };
 
+  // ===== RESEARCH REPORT HANDLER =====
+  const handleGenerateReport = async () => {
+    if (isGeneratingReport || !reportTopic.trim() || !activeSessionId) return;
+
+    setIsGeneratingReport(true);
+
+    try {
+      const res = await fetch('/api/generate-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topic: reportTopic, sessionId: activeSessionId })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const report: ResearchReport = {
+          id: data.report.id,
+          topic: data.report.topic,
+          content: data.report.content,
+          papers: data.report.papers,
+          createdAt: new Date().toISOString(),
+        };
+
+        setReports(prev => [report, ...prev]);
+        setActiveModal({ type: 'report', report });
+        setReportTopic('');
+        showToast('Research report generated!', 'success');
+      } else {
+        showToast(data.error || 'Failed to generate report', 'error');
+      }
+    } catch (err) {
+      console.error('Report generation error:', err);
+      showToast('Connection error. Please try again.', 'error');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   // ===== CHAT HANDLER =====
 
   const handleSend = useCallback(async () => {
-    if (!input.trim() || isSending) return;
+    if (!input.trim() || isSending || !activeSessionId) return;
     const userMessage = input.trim();
     setInput('');
     setIsSending(true);
+
+    // Auto-title session on first user message
+    if (messages.length <= 1) {
+      const title = userMessage.length > 40 ? userMessage.substring(0, 37) + '...' : userMessage;
+      fetch(`/api/sessions/${activeSessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      }).then(() => {
+        setSessions(prev => prev.map(s =>
+          s.id === activeSessionId ? { ...s, title } : s
+        ));
+      }).catch(() => {});
+    }
 
     const updatedMessages: Message[] = [
       ...messages,
@@ -361,7 +533,7 @@ export default function Home() {
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: updatedMessages, selectedSourceIds }),
+        body: JSON.stringify({ messages: updatedMessages, selectedSourceIds, sessionId: activeSessionId }),
       });
 
       if (!res.ok) {
@@ -402,7 +574,7 @@ export default function Home() {
     } finally {
       setIsSending(false);
     }
-  }, [input, isSending, messages]);
+  }, [input, isSending, messages, activeSessionId, selectedSourceIds]);
 
   // ===== SOURCE HANDLERS =====
 
@@ -412,11 +584,12 @@ export default function Home() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeSessionId) return;
 
     setIsUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('sessionId', activeSessionId);
 
     try {
       const res = await fetch('/api/upload', {
@@ -443,14 +616,14 @@ export default function Home() {
   };
 
   const handleAddUrl = async () => {
-    if (!urlInput.trim() || isUrlAdding) return;
+    if (!urlInput.trim() || isUrlAdding || !activeSessionId) return;
     setIsUrlAdding(true);
 
     try {
       const res = await fetch('/api/fetch-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: urlInput }),
+        body: JSON.stringify({ url: urlInput, sessionId: activeSessionId }),
       });
       const data = await res.json();
       if (data.success && data.source) {
@@ -496,7 +669,7 @@ export default function Home() {
   return (
     <div className={styles.dashboard}>
 
-      {/* ===== LEFT SIDEBAR: Sources ===== */}
+      {/* ===== LEFT SIDEBAR: History + Sources ===== */}
       <aside className={`${styles.sidebar} ${styles.leftSidebar} ${!leftOpen ? styles.sidebarCollapsed : ''}`}>
         {leftOpen && (
           <>
@@ -505,6 +678,58 @@ export default function Home() {
               <p className={styles.sidebarSubtitle}>Your AI Research Notebook</p>
             </div>
 
+            {/* New Chat Button */}
+            <button
+              className={styles.newChatButton}
+              onClick={handleNewChat}
+              disabled={isCreatingSession}
+            >
+              {isCreatingSession ? <Loader2 size={18} className={styles.spin} /> : <SquarePen size={18} />}
+              <span>New Chat</span>
+            </button>
+
+            {/* History Section */}
+            <div className={styles.historySection}>
+              <div className={styles.historySectionTitle}>
+                <Clock size={14} />
+                <span>History</span>
+              </div>
+              <div className={styles.historyList}>
+                {isLoadingSessions ? (
+                  <div className={styles.emptyState}>
+                    <Loader2 size={20} className={styles.spin} />
+                    <span>Loading...</span>
+                  </div>
+                ) : sessions.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <MessageSquarePlus size={24} style={{ opacity: 0.3 }} />
+                    <span>No conversations yet</span>
+                  </div>
+                ) : (
+                  sessions.map(session => (
+                    <div
+                      key={session.id}
+                      className={`${styles.historyItem} ${session.id === activeSessionId ? styles.historyItemActive : ''}`}
+                      onClick={() => loadSession(session.id)}
+                    >
+                      <div className={styles.historyItemContent}>
+                        <span className={styles.historyItemTitle}>{session.title}</span>
+                        <span className={styles.historyItemTime}>{formatDate(session.updatedAt)}</span>
+                      </div>
+                      <button
+                        className={styles.historyDeleteButton}
+                        onClick={(e) => handleDeleteSession(session.id, e)}
+                        title="Delete chat"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* ===== Sources Section (within active session) ===== */}
             <div className={styles.sourceSection}>
               <span className={styles.sourceSectionTitle}>Sources ({sources.length})</span>
             </div>
@@ -562,12 +787,12 @@ export default function Home() {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') handleAddUrl();
                   }}
-                  disabled={isUrlAdding}
+                  disabled={isUrlAdding || !activeSessionId}
                 />
                 <button
                   className={styles.urlAddButton}
                   onClick={handleAddUrl}
-                  disabled={isUrlAdding || !urlInput.trim()}
+                  disabled={isUrlAdding || !urlInput.trim() || !activeSessionId}
                   title="Add Link"
                 >
                   {isUrlAdding ? <Loader2 size={16} className={styles.spin} /> : <LinkIcon size={16} />}
@@ -581,7 +806,7 @@ export default function Home() {
               <button
                 className={styles.uploadButton}
                 onClick={handleUploadClick}
-                disabled={isUploading}
+                disabled={isUploading || !activeSessionId}
               >
                 {isUploading
                   ? <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
@@ -636,7 +861,7 @@ export default function Home() {
           <div className={styles.chatInputBox}>
             <textarea
               className={styles.textarea}
-              placeholder="Ask questions about your sources..."
+              placeholder={activeSessionId ? "Ask questions about your sources..." : "Create a new chat to get started..."}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -646,11 +871,12 @@ export default function Home() {
                 }
               }}
               rows={1}
+              disabled={!activeSessionId}
             />
             <button
               className={styles.sendButton}
               onClick={handleSend}
-              disabled={!input.trim() || isSending}
+              disabled={!input.trim() || isSending || !activeSessionId}
             >
               {isSending ? <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> : <Send size={16} />}
             </button>
@@ -658,7 +884,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* ===== RIGHT SIDEBAR: Studio + Artifacts ===== */}
+      {/* ===== RIGHT SIDEBAR: Studio + Artifacts + Research ===== */}
       <aside className={`${styles.sidebar} ${styles.rightSidebar} ${!rightOpen ? styles.sidebarCollapsed : ''}`}>
         <button
           className={`${styles.collapseToggle} ${styles.collapseToggleRight}`}
@@ -725,6 +951,63 @@ export default function Home() {
               </button>
             </div>
 
+            {/* --- RESEARCH REPORT SECTION --- */}
+            <div className={styles.researchSection}>
+              <div className={styles.researchSectionTitle}>
+                <BookOpen size={16} />
+                <span>Research Report</span>
+              </div>
+              <p className={styles.researchDesc}>Search the web for papers and generate a 2-3 page summary report</p>
+              <div className={styles.researchInputWrapper}>
+                <input
+                  type="text"
+                  className={styles.researchInput}
+                  placeholder="Enter a research topic..."
+                  value={reportTopic}
+                  onChange={e => setReportTopic(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleGenerateReport();
+                  }}
+                  disabled={isGeneratingReport || !activeSessionId}
+                />
+                <button
+                  className={styles.researchGenerateButton}
+                  onClick={handleGenerateReport}
+                  disabled={isGeneratingReport || !reportTopic.trim() || !activeSessionId}
+                  title="Generate Research Report"
+                >
+                  {isGeneratingReport ? <Loader2 size={16} className={styles.spin} /> : <Search size={16} />}
+                </button>
+              </div>
+              {isGeneratingReport && (
+                <div className={styles.researchStatus}>
+                  <Loader2 size={14} className={styles.spin} />
+                  <span>Searching papers & generating report...</span>
+                </div>
+              )}
+
+              {/* Past reports list */}
+              {reports.length > 0 && (
+                <div className={styles.reportsList}>
+                  {reports.map(report => (
+                    <button
+                      key={report.id}
+                      className={styles.reportCard}
+                      onClick={() => setActiveModal({ type: 'report', report })}
+                    >
+                      <BookOpen size={14} />
+                      <div className={styles.reportCardInfo}>
+                        <span className={styles.reportCardTitle}>{report.topic}</span>
+                        <span className={styles.reportCardTime}>
+                          {new Date(report.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* --- ARTIFACTS SECTION --- */}
             {artifacts.length > 0 && (
               <div className={styles.artifactsSection}>
@@ -764,7 +1047,7 @@ export default function Home() {
       </aside>
 
       {/* ===== AUDIO MODAL ===== */}
-      {activeModal?.type === 'audio' && activeModal.artifact.url && (
+      {activeModal?.type === 'audio' && activeModal.artifact?.url && (
         <div className={styles.modalOverlay} onClick={closeModal}>
           <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
             <button className={styles.modalClose} onClick={closeModal}>
@@ -818,7 +1101,7 @@ export default function Home() {
       )}
 
       {/* ===== SUMMARY MODAL ===== */}
-      {activeModal?.type === 'summary' && activeModal.artifact.content && (
+      {activeModal?.type === 'summary' && activeModal.artifact?.content && (
         <div className={styles.modalOverlay} onClick={closeModal}>
           <div className={`${styles.modalContent} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
             <button className={styles.modalClose} onClick={closeModal}>
@@ -840,7 +1123,7 @@ export default function Home() {
       )}
 
       {/* ===== SLIDES MODAL ===== */}
-      {activeModal?.type === 'slides' && activeModal.artifact.url && (
+      {activeModal?.type === 'slides' && activeModal.artifact?.url && (
         <div className={styles.modalOverlay} onClick={closeModal}>
           <div className={`${styles.modalContent} ${styles.modalFullscreen}`} onClick={e => e.stopPropagation()}>
             <button className={styles.modalClose} onClick={closeModal} title="Close Slides">
@@ -864,6 +1147,47 @@ export default function Home() {
                 title="Slides Viewer"
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===== RESEARCH REPORT MODAL ===== */}
+      {activeModal?.type === 'report' && activeModal.report && (
+        <div className={styles.modalOverlay} onClick={closeModal}>
+          <div className={`${styles.modalContent} ${styles.modalWide}`} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalClose} onClick={closeModal}>
+              <X size={20} />
+            </button>
+            <h2 className={styles.modalTitle}>
+              <BookOpen size={22} /> Research Report: {activeModal.report.topic}
+            </h2>
+            <div className={styles.summaryBody}>
+              <ReactMarkdown
+                remarkPlugins={[remarkMath, remarkGfm]}
+                rehypePlugins={[rehypeKatex]}
+              >
+                {activeModal.report.content}
+              </ReactMarkdown>
+            </div>
+            {activeModal.report.papers && activeModal.report.papers.length > 0 && (
+              <div className={styles.reportPapers}>
+                <h3 className={styles.reportPapersTitle}>Sources Used ({activeModal.report.papers.length} papers)</h3>
+                <div className={styles.reportPapersList}>
+                  {activeModal.report.papers.map((paper, i) => (
+                    <a
+                      key={i}
+                      href={paper.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.reportPaperLink}
+                    >
+                      <FileText size={14} />
+                      <span>{paper.title}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

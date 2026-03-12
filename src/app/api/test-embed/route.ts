@@ -11,11 +11,13 @@ export async function GET() {
       dimension: embedding.length, 
       sample: embedding.slice(0, 5) 
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     console.error('Embedding test error:', error);
     return NextResponse.json({ 
-      error: error.message,
-      stack: error.stack?.slice(0, 500)
+      error: errorMessage,
+      stack: errorStack?.slice(0, 500)
     }, { status: 500 });
   }
 }

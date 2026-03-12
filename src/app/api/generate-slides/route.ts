@@ -25,8 +25,14 @@ export async function POST(req: NextRequest) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    const pythonPath = path.join(process.cwd(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
-    const scriptPath = path.join(process.cwd(), 'main.py');
+    // Prevent Turbopack from tracing .venv symlinks statically
+    const cwd = process.cwd();
+    const venv = String.fromCharCode(46, 118, 101, 110, 118); // .venv
+    const binDir = process.platform === 'win32' ? 'Scripts' : 'bin';
+    const pyExe = process.platform === 'win32' ? 'python.exe' : 'python';
+    
+    const pythonPath = path.resolve(cwd, venv, binDir, pyExe);
+    const scriptPath = path.resolve(cwd, 'main.py');
 
     console.log(`Generating slides for ${sourceId}...`);
     
@@ -44,8 +50,9 @@ export async function POST(req: NextRequest) {
           }
         });
       });
-    } catch (execError: any) {
-      console.error('Python Helper Error:', execError.message);
+    } catch (execError: unknown) {
+      const errorMessage = execError instanceof Error ? execError.message : String(execError);
+      console.error('Python Helper Error:', errorMessage);
       throw execError;
     }
 
@@ -70,10 +77,11 @@ export async function POST(req: NextRequest) {
       slidesCount: deckData.slides.length
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Generate Slides Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
+      { error: errorMessage },
       { status: 500 }
     );
   }
