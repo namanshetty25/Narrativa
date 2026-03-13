@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@google/genai": "^1.44.0",
+    "@prisma/adapter-better-sqlite3": "^7.5.0",
     "@prisma/client": "^7.4.2",
+    "better-sqlite3": "^12.6.2",
     "cheerio": "^1.2.0",
     "faiss-node": "^0.5.1",
     "lucide-react": "^0.577.0",
@@ -25,6 +27,7 @@
     "reveal.js": "^5.2.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
