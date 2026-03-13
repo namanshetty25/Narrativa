@@ -1,130 +1,123 @@
-# Narrativa
+# Narrativa: AI-Powered Research Notebook
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Narrativa is a full-stack Next.js web application that acts as your personalized AI research assistant (inspired by Google's NotebookLM). You can upload documents, web links, and YouTube videos, and let the AI generate audio podcasts, executive summaries, presentation slides, and deep-dive research reports based on your sources.
 
-## Getting Started
+## Features
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
----
-
-# 🎨 PDF-to-Slides: AI-Powered Presentation Generator
-
-Convert PDF documents into beautiful HTML presentation slides using an AI agent powered by **LangChain**, **LangGraph**, and **Google Gemini**.
-
-## How It Works
-
-A LangGraph React agent orchestrates 7 specialized tools to:
-
-1. **Analyze** PDF pages — extract text, render high-res images
-2. **Extract theme** — detect fonts, colors, sizes from the PDF
-3. **Detect assets** — find images, charts, diagrams via Gemini Vision
-4. **Extract tables** — detect and convert tables to structured HTML
-5. **Process assets** — crop detections or extract SVGs
-6. **Plan slides** — AI designs 1–4 slides per page with optimal layouts
-7. **Render HTML** — generate standalone 1920×1080 slide files
-
-## Quick Start
-
-### 1. Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Set Up API Key
-
-```bash
-cp .env.example .env
-```
-
-Edit `.env` and add your [Google AI Studio](https://aistudio.google.com/apikey) API key:
-
-```
-GOOGLE_API_KEY=your_api_key_here
-```
-
-### 3. Run
-
-```bash
-# Convert entire PDF
-python main.py --pdf input.pdf --output my_slides
-
-# Convert specific pages only
-python main.py --pdf input.pdf --output my_slides --pages 1-5
-
-# Uses default output dir (<pdf_name>_slides)
-python main.py --pdf input.pdf
-```
-
-### 4. View Slides
-
-Open any file in `my_slides/slides/` in a browser. Each slide is a standalone HTML file at 1920×1080.
-
-## Project Structure
-
-```
-├── main.py            # CLI entry point
-├── agent.py           # LangGraph React agent
-├── tools.py           # 7 LangChain @tool definitions
-├── templates.py       # HTML slide renderer (8 layouts)
-├── config.py          # Model setup & configuration
-├── requirements.txt   # Python dependencies
-├── .env.example       # API key template
-└── public/            # Static assets and generated slides
-```
-
-## Available Slide Layouts
-
-| Layout | Description |
-|--------|-------------|
-| `text_only` | Full-width text |
-| `full_image` | Background image with text overlay |
-| `text_left_image_right_large` | 50/50 split, large image |
-| `text_right_image_left_large` | Mirror of above |
-| `text_left_image_right_medium` | 50/50 split, medium image |
-| `text_right_image_left_medium` | Mirror of above |
-| `text_left_two_images_right` | Text + two stacked images |
-| `text_right_two_images_left` | Mirror of above |
-
-## Requirements
-
-- Python 3.10+
-- Google Gemini API key
+- **2-Page Architecture**: A stunning, animated landing page and a dedicated 3-panel workspace for your research logic.
+- **Source Management**: Upload PDFs, paste YouTube URLs, or link to web pages to build a knowledge base for your notebook.
+- **Chat Interface**: Ask questions against your specific sources. The AI will respond with precise, inline citations (e.g., `[Source-1]`).
+- **5 Studio Tools**: 
+  - 🎧 **Audio Overview**: Generates a conversational podcast explaining your sources using TTS.
+  - 📊 **Executive Summary**: Creates a structured, one-page overview with key findings.
+  - 🎨 **Slides Generator**: Turns your documents into beautiful, presentation-ready slide decks.
+  - 📽️ **Topic to Slides**: Researches any web topic to create data-driven presentations.
+  - 📚 **Research Report**: Writes a comprehensive, strictly-formatted academic report with references.
 
 ## Tech Stack
 
-- **LangChain** + **LangGraph** — agent orchestration & tool calling
-- **Google Gemini 2.5** — Flash (detection) + Pro (planning)
-- **PyMuPDF** — PDF text/image extraction
+- **Frontend**: Next.js 14+ (App Router), React, CSS Modules, Lucide Icons
+- **Backend**: Next.js Route Handlers
+- **Database**: Prisma ORM with local SQLite (`dev.db`)
+- **AI Integration**: Google Gemini 2.0 Flash / Pro via `@google/genai`
+- **Asset Processing**: Embedded Python scripts (PyMuPDF, gTTS, LangChain) for handling complex PDF extraction, text-to-speech generation, and slide layouts.
+
+---
+
+## 🚀 Setup Instructions
+
+### 1. Prerequisites
+
+You must have the following installed on your machine:
+- **Node.js**: (v18 or higher)
+- **Python**: (3.10 or higher) for local PDF parsing and TTS generation.
+
+### 2. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd Narrativa
+```
+
+### 3. Install Node Dependencies
+
+Install the necessary npm packages for the Next.js application:
+
+```bash
+npm install
+```
+
+### 4. Set Up the Python Virtual Environment
+
+The application relies on Python scripts (located in the `./scripts/` and root directories) for heavy document processing and TTS.
+
+```bash
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows:
+.venv\Scripts\activate
+# On macOS/Linux:
+source .venv/bin/activate
+
+# Install Python requirements
+pip install -r requirements.txt
+```
+
+### 5. Setup Environment Variables
+
+Create a new file named `.env` in the root directory (you can copy `.env.example` if it exists).
+
+```bash
+# .env
+
+# Your Google Gemini API Key
+GOOGLE_API_KEY="your_api_key_here"
+
+# Optional alias if you prefer
+GEMINI_API_KEY="your_api_key_here"
+
+# Database URL for Prisma (SQLite)
+DATABASE_URL="file:./dev.db"
+```
+
+*Note: You can get your API key from [Google AI Studio](https://aistudio.google.com/apikey).*
+
+### 6. Initialize the Database
+
+Use Prisma to push the schema and create your local SQLite database (`dev.db`):
+
+```bash
+npx prisma db push
+```
+
+### 7. Run the Development Server
+
+Start the Next.js development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to explore the application!
+
+---
+
+## Folder Structure
+
+```
+Narrativa/
+├── src/
+│   ├── app/                 # Next.js App Router (Landing, API routes, Notebook workspace)
+│   ├── lib/                 # Shared utilities (store.ts, vector-store.ts, web-search.ts)
+│   └── components/          # Reusable UI components
+├── prisma/                  # Prisma schema definition
+├── scripts/                 # Python utilities (TTS, etc.)
+├── .venv/                   # Python virtual environment (ignored in git)
+├── .audio/                  # Generated MP3 assets (ignored in git)
+└── .data/                   # local vector embeddings (ignored in git)
+```
+
+## Contributing
+Contributions and feature requests are welcome! Create a branch and submit a PR for review.
