@@ -39,17 +39,27 @@ export async function POST(req: Request) {
           role: 'user',
           parts: [
             {
-              text: `You are an expert at creating concise, well-structured summaries. Based on the following source material, create a one-page executive summary report.
+              text: `You are an expert at creating concise, well-structured executive summaries. Based on the following source material, create a one-page summary report.
 
-FORMAT:
-- Start with a bold title that captures the main topic
-- Write a brief 1-2 sentence overview/abstract
-- Cover all KEY points organized into clear sections with headers
-- Use bullet points for key takeaways
-- End with a "Key Takeaways" or "Conclusion" section
-- Use markdown formatting (headers, bold, bullets) for readability
-- Keep the entire summary to roughly one page (400-600 words)
-- Be precise and informative — every sentence should add value
+You MUST use EXACTLY this structure with these section headers:
+
+**Overview:** (2 sentences that capture the main topic and scope)
+
+**Key Findings:**
+- (3–5 bullet points, each a specific finding from the material)
+
+**Evidence:** (2–4 cited data points, statistics, or direct claims from the sources that support the findings)
+
+**Implications:** (2–3 sentences on what these findings mean and why they matter)
+
+**Next Steps:**
+- (2–3 actionable bullet points for follow-up)
+
+RULES:
+- Maximum 380 words total. Dense, professional, no filler.
+- Every sentence must add value — no padding or repetition.
+- Use markdown formatting (bold headers, bullets) for readability.
+- Cite specific data from the sources where possible.
 
 SOURCE MATERIAL:
 ${cappedContent}`,
@@ -58,7 +68,7 @@ ${cappedContent}`,
         },
       ],
       config: {
-        maxOutputTokens: 1200,
+        maxOutputTokens: 800,
       },
     });
 

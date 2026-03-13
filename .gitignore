@@ -75,3 +75,13 @@ sam3/
 *.swo
 
 /src/generated/prisma
+
+# Database
+*.db
+*.sqlite
+dev.db
+
+# Test and Scratch logs
+test_doc.txt
+lint_output.txt
+my_ncert/

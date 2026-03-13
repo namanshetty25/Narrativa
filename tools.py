@@ -13,19 +13,7 @@ from PIL import Image
 from langchain_core.tools import tool
 from langchain_core.messages import HumanMessage
 
-from config import get_flash_model, get_pro_model, get_sam3_processor
-
-# Lazy-load SAM3 processor (only once)
-_sam3_processor = None
-_sam3_loaded = False
-
-
-def _get_sam3():
-    global _sam3_processor, _sam3_loaded
-    if not _sam3_loaded:
-        _sam3_processor = get_sam3_processor()
-        _sam3_loaded = True
-    return _sam3_processor
+from config import get_flash_model, get_pro_model
 
 
 def _img_to_b64(path: str) -> str:
@@ -364,25 +352,7 @@ def process_asset(
     output_dir: str,
     asset_index: int,
 ) -> str:
-    """Process a single detected asset: crop from the page image as a clean PNG.
-
-    Uses Gemini Vision to verify if SAM3 segmentation is needed for complex types.
-
-    Args:
-        page_image_path: Path to the full page image.
-        page_num: Page number (1-indexed).
-        xmin: Left coordinate (0-1000 normalized).
-        ymin: Top coordinate (0-1000 normalized).
-        xmax: Right coordinate (0-1000 normalized).
-        ymax: Bottom coordinate (0-1000 normalized).
-        label: Description of the asset.
-        asset_type: "rectangular" or "complex".
-        output_dir: Output directory for saved assets.
-        asset_index: Index number for the output filename.
-
-    Returns:
-        JSON string with path and description of the processed asset.
-    """
+    """Process a single detected asset: crop from the page image as a clean PNG."""
     assets_dir = os.path.join(output_dir, "assets")
     os.makedirs(assets_dir, exist_ok=True)
 
@@ -398,87 +368,33 @@ def process_asset(
     bottom = int(ymax / 1000 * img_h)
     cropped = pil_img.crop((left, top, right, bottom))
 
-    if asset_type == "complex":
-        # Ask Gemini Flash: does this really need segmentation?
-        needs_sam = _verify_needs_segmentation(cropped, label)
-
-        if needs_sam:
-            processor = _get_sam3()
-            if processor is not None:
-                seg_result = _segment_with_sam3(pil_img, label, xmin, ymin, xmax, ymax, png_path, processor)
-                if seg_result:
-                    return json.dumps({"path": seg_result, "description": label})
-
     # Save the crop
     cropped.save(png_path, "PNG")
     return json.dumps({"path": png_path, "description": label})
 
 
-def _verify_needs_segmentation(cropped_img: Image.Image, label: str) -> bool:
-    """Ask Gemini Flash if this image truly needs SAM3 segmentation."""
-    try:
-        # Save cropped to temp for b64 encoding
-        import io
-        buf = io.BytesIO()
-        cropped_img.save(buf, format="PNG")
-        b64 = base64.b64encode(buf.getvalue()).decode()
-
-        model = get_flash_model()
-        message = HumanMessage(content=[
-            {
-                "type": "text",
-                "text": (
-                    f'This image is described as "{label}". '
-                    "Does this image contain an irregular/complex shape that would benefit "
-                    "from precise background-removal segmentation, or is a simple rectangular "
-                    'crop sufficient? Answer ONLY with JSON: {"needs_segmentation": true/false}'
-                ),
-            },
-            {"type": "image_url", "image_url": f"data:image/png;base64,{b64}"},
-        ])
-        response = model.invoke([message])
-        data = _safe_json(response.content, "Segmentation Check")
-        return data.get("needs_segmentation", False)
-    except Exception:
-        return False
 
 
-def _segment_with_sam3(pil_img, description, xmin, ymin, xmax, ymax, output_path, processor):
-    """Run SAM3 text-prompted segmentation. Returns output path on success, None on failure."""
-    try:
-        from scipy.ndimage import zoom as scipy_zoom
+# ================================================================
+# Modern theme defaults
+# ================================================================
 
-        inference_state = processor.set_image(pil_img)
-        output = processor.set_text_prompt(state=inference_state, prompt=description)
-
-        if "masks" not in output or len(output["masks"]) == 0:
-            return None
-
-        mask_tensor = output["masks"][0]
-        mask_np = mask_tensor.cpu().detach().numpy().squeeze()
-
-        h, w = pil_img.height, pil_img.width
-        if mask_np.shape != (h, w):
-            zoom_factors = (h / mask_np.shape[0], w / mask_np.shape[1])
-            mask_np = scipy_zoom(mask_np.astype(float), zoom_factors)
-
-        rgba = pil_img.convert("RGBA")
-        data = np.array(rgba)
-        alpha = (mask_np > 0.5).astype(np.uint8) * 255
-        data[:, :, 3] = alpha
-        segmented = Image.fromarray(data)
-
-        bbox = segmented.getbbox()
-        if bbox:
-            segmented = segmented.crop(bbox)
-
-        segmented.save(output_path, "PNG")
-        print(f"    → SAM3 segmentation successful: {description}")
-        return output_path
-
-    except Exception as e:
-        print(f"    ⚠️  SAM3 failed ({e}), falling back to crop")
-        return None
+DEFAULT_THEME = {
+    "font_family": "'Inter', 'Segoe UI', system-ui, sans-serif",
+    "heading_color": "#0F172A",
+    "body_color": "#334155",
+    "accent_color": "#6366F1",
+    "accent_soft": "#EEF2FF",
+    "bg_color": "#FFFFFF",
+    "bg_alt": "#F8FAFC",
+    "banner_bg": "#0F172A",
+    "banner_text": "#FFFFFF",
+    "h1_size": 64,
+    "h2_size": 40,
+    "body_size": 26,
+    "border_radius": "14px",
+    "shadow": "0 10px 30px rgba(0,0,0,0.1)",
+}
 
 
 # ================================================================
@@ -518,52 +434,67 @@ def plan_slides(page_text: str, assets_json: str, tables_json: str) -> str:
         table_infos.append(f"Table {idx+1}: {tbl.get('description', 'Unnamed table')}")
     table_str = "\n".join(table_infos) if table_infos else "No tables found."
 
-    prompt = f"""You are a world-class presentation designer converting textbook/educational pages into beautiful, clear slides.
+    has_assets = asset_str != "No visual assets available."
 
-You are designing for an education-themed presentation with a clean, professional look.
+    prompt = f"""You are an elite presentation designer working at Apple / TED / Stanford.
 
-Task:
-- Analyze the page text, available assets, and extracted tables
-- Split into 1–4 logical slides (avoid overcrowding — ensure content fits without overflow)
-- Preserve all important text verbatim (do not summarize or paraphrase)
-- IMPORTANT: Do NOT include the slide title in the "content" array — title is handled separately
-- Structure content flexibly: Use "# Heading" for h1, "## Subheading" for h2, plain strings for paragraphs
-- Use paragraphs for narrative sections; use bullet points (starting with "- ") if the text is list-like
-- Assign 0-2 most relevant assets to each slide
+Your task is to convert a textbook page into BEAUTIFUL presentation slides.
 
-CRITICAL IMAGE RULES:
-- If assets are available, you MUST assign at least one asset to each slide
-- Do NOT use "text_only" layout when assets are available — use a layout with images
-- Use image_index (1-based) to reference assets from the available assets list
-- Charts, graphs, and financial data should ALWAYS be paired with their corresponding text
+GOAL: Slides must be visually clean, modern, minimal, and engaging.
 
-TABLE RULES:
-- If tables were extracted, include the raw HTML <table> directly in the "content" array
-- Tables render with professional styling automatically
+CRITICAL DESIGN RULES:
 
-Available layouts (PREFER layouts with images when assets exist):
-- text_left_image_right_large: 50% left text, 50% right asset (fills height) — BEST for charts/graphs
-- text_right_image_left_large: Mirror of above
-- text_left_image_right_medium: 50% left text, 50% right asset (medium size)
-- text_right_image_left_medium: Mirror of above
-- text_left_two_images_right: Text left (50%), two assets stacked right (50%)
-- text_right_two_images_left: Mirror of above
-- full_image: Full slide asset with overlay text — good for title slides
-- text_only: Full text, no assets — ONLY use when no assets are available
+1. ONE IDEA PER SLIDE - Never overload slides.
+
+2. TEXT LIMITS{' (relaxed since no images available)' if not has_assets else ''}
+   Maximum per slide:
+   - {'8' if not has_assets else '6'} bullet points
+   - {'18' if not has_assets else '12'} words per bullet
+   - {'80' if not has_assets else '40'} words per slide total
+
+3. VISUAL PRIORITY
+   {'Since NO images are available, use rich text hierarchy with headings, subheadings, and bullets to create visual interest.' if not has_assets else 'Images and diagrams should dominate. Text SUPPORTS visuals.'}
+
+4. TYPOGRAPHY HIERARCHY
+   "# Heading" - slide headline
+   "## Subheading" - supporting idea
+   "- bullet" - key points
+   Plain text - explanation
+
+5. IMAGE USAGE
+   {'No assets available - use text_only layout with strong visual hierarchy.' if not has_assets else 'Every slide MUST contain an image. Use large visuals. Charts must appear beside explanations.'}
+
+6. SLIDE TYPES YOU SHOULD USE
+
+   {'Available layouts (text-only since no assets):' if not has_assets else 'Available layouts (PREFER layouts with images):'}
+   - hero_image: Large image with title overlay (great for opening slides)
+   - big_number: One key statistic or idea, centered and bold
+   - visual_focus: Large diagram center, minimal text
+   - text_left_image_right_large: 50/50 split, image right - BEST for charts
+   - text_right_image_left_large: Mirror of above
+   - text_left_image_right_medium: 50/50 split, medium image
+   - text_right_image_left_medium: Mirror of above
+   - text_left_two_images_right: Text + two stacked images
+   - text_right_two_images_left: Mirror of above
+   - comparison: Two columns for comparing concepts
+   - step_process: 3-4 steps shown horizontally
+   - full_image: Full background image with overlay text
+   - text_only: Full text, no assets - {'USE THIS with rich formatting' if not has_assets else 'ONLY when no assets exist'}
+
+7. TABLE RULES
+   If tables exist, convert into visual comparison slides or include HTML table.
 
 Return ONLY a valid JSON array:
 [
   {{
     "title": "Slide title (DO NOT repeat in content)",
-    "content": ["# Heading", "Paragraph text.", "## Sub Heading", "More text."],
+    "content": ["# Heading", "## Subheading", "- Key point 1", "- Key point 2"],
     "layout": "text_left_image_right_large",
-    "images": [
-      {{
-        "image_index": 1,
-        "size": "large",
-        "position": "right"
-      }}
-    ],
+    "images": [{{{{
+      "image_index": 1,
+      "size": "large",
+      "position": "right"
+    }}}}],
     "styles": {{}}
   }}
 ]

@@ -113,32 +113,17 @@ export async function addSourceAndChunks(
     },
   });
 
-  // Basic semantic chunking
-  const paragraphs = source.text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-  let currentChunk = '';
-  const chunks: DocumentChunk[] = [];
+  // Recursive character text splitter with overlap
+  const CHUNK_SIZE = 800;
+  const CHUNK_OVERLAP = 150;
+  const rawChunks = recursiveSplit(source.text, CHUNK_SIZE, CHUNK_OVERLAP);
 
-  for (const paragraph of paragraphs) {
-    if (currentChunk.length + paragraph.length > 1000) {
-      if (currentChunk.trim()) {
-        chunks.push({
-          id: crypto.randomUUID(),
-          sourceId: source.id,
-          text: currentChunk.trim(),
-        });
-      }
-      currentChunk = paragraph + '\n\n';
-    } else {
-      currentChunk += paragraph + '\n\n';
-    }
-  }
-  if (currentChunk.trim()) {
-    chunks.push({
-      id: crypto.randomUUID(),
-      sourceId: source.id,
-      text: currentChunk.trim(),
-    });
-  }
+  // Add metadata header to each chunk for better retrieval context
+  const chunks: DocumentChunk[] = rawChunks.map((text, idx) => ({
+    id: crypto.randomUUID(),
+    sourceId: source.id,
+    text: `[Source: ${source.name} | Type: ${source.type} | Chunk ${idx + 1}/${rawChunks.length}]\n${text}`,
+  }));
 
   // Bulk create chunks
   if (chunks.length > 0) {
@@ -153,6 +138,64 @@ export async function addSourceAndChunks(
 
   await touchSession(sessionId);
   return { source, chunks };
+}
+
+/**
+ * Recursive character text splitter with overlap.
+ * Tries separators in order: double newline > single newline > sentence end > space.
+ * Produces chunks of roughly `chunkSize` chars with `overlap` chars of context carried over.
+ */
+function recursiveSplit(text: string, chunkSize: number, overlap: number): string[] {
+  const separators = ['\n\n', '\n', '. ', ' '];
+
+  function splitRecursive(input: string, sepIdx: number): string[] {
+    if (input.length <= chunkSize) return [input.trim()].filter(s => s.length > 0);
+
+    const sep = separators[sepIdx];
+    const parts = input.split(sep);
+
+    // If splitting didn't help or we're at the last separator, force-split
+    if (parts.length <= 1) {
+      if (sepIdx < separators.length - 1) {
+        return splitRecursive(input, sepIdx + 1);
+      }
+      // Force character split as last resort
+      const result: string[] = [];
+      for (let i = 0; i < input.length; i += chunkSize - overlap) {
+        result.push(input.slice(i, i + chunkSize).trim());
+      }
+      return result.filter(s => s.length > 0);
+    }
+
+    // Merge parts into chunks respecting chunkSize
+    const merged: string[] = [];
+    let current = '';
+    for (const part of parts) {
+      const candidate = current ? current + sep + part : part;
+      if (candidate.length > chunkSize && current) {
+        merged.push(current.trim());
+        // Carry overlap from the end of the previous chunk
+        const overlapText = current.slice(-overlap);
+        current = overlapText + sep + part;
+      } else {
+        current = candidate;
+      }
+    }
+    if (current.trim()) merged.push(current.trim());
+
+    // If any merged chunk is still too large, recurse with next separator
+    const result: string[] = [];
+    for (const chunk of merged) {
+      if (chunk.length > chunkSize * 1.5 && sepIdx < separators.length - 1) {
+        result.push(...splitRecursive(chunk, sepIdx + 1));
+      } else {
+        result.push(chunk);
+      }
+    }
+    return result.filter(s => s.length > 0);
+  }
+
+  return splitRecursive(text, 0);
 }
 
 export async function deleteSourceAndChunks(id: string) {

@@ -92,9 +92,9 @@ export function searchVector(queryEmbedding: number[], topK: number = 5): string
   const queryArray = Array.from(new Float32Array(queryEmbedding));
   
   try {
-    // search() returns { distances, labels }
-    // labels are the integer IDs inside FAISS
-    const results = faissIndex.search(queryArray, topK);
+    // Prevent FAISS error: topK cannot exceed total items in index
+    const actualK = Math.min(topK, faissIndex.ntotal());
+    const results = faissIndex.search(queryArray, actualK);
     
     const matchingChunkIds: string[] = [];
     for (let i = 0; i < results.labels.length; i++) {

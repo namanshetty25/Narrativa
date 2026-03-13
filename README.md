@@ -51,7 +51,7 @@ A LangGraph React agent orchestrates 7 specialized tools to:
 2. **Extract theme** — detect fonts, colors, sizes from the PDF
 3. **Detect assets** — find images, charts, diagrams via Gemini Vision
 4. **Extract tables** — detect and convert tables to structured HTML
-5. **Process assets** — crop, segment (SAM3), or extract SVGs
+5. **Process assets** — crop detections or extract SVGs
 6. **Plan slides** — AI designs 1–4 slides per page with optimal layouts
 7. **Render HTML** — generate standalone 1920×1080 slide files
 
@@ -102,7 +102,7 @@ Open any file in `my_slides/slides/` in a browser. Each slide is a standalone HT
 ├── config.py          # Model setup & configuration
 ├── requirements.txt   # Python dependencies
 ├── .env.example       # API key template
-└── sam3/              # SAM3 model (optional, for GPU)
+└── public/            # Static assets and generated slides
 ```
 
 ## Available Slide Layouts
@@ -122,11 +122,9 @@ Open any file in `my_slides/slides/` in a browser. Each slide is a standalone HT
 
 - Python 3.10+
 - Google Gemini API key
-- **Optional**: NVIDIA GPU + PyTorch for SAM3 segmentation (falls back to cropping without it)
 
 ## Tech Stack
 
 - **LangChain** + **LangGraph** — agent orchestration & tool calling
 - **Google Gemini 2.5** — Flash (detection) + Pro (planning)
 - **PyMuPDF** — PDF text/image extraction
-- **SAM3** — optional image segmentation

@@ -5,7 +5,24 @@ import { generateEmbeddings } from "@/lib/embeddings";
 
 export async function POST(req: NextRequest) {
   try {
-    const { url, sessionId } = await req.json();
+    let { url, sessionId } = await req.json();
+
+    if (url && typeof url === "string") {
+      // Normalize protocol-relative URLs
+      if (url.startsWith("//")) {
+        url = `https:${url}`;
+      }
+
+      // Handle DuckDuckGo redirect URLs (e.g., https://duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.researchgate.net...)
+      try {
+        const parsedUrl = new URL(url);
+        if (parsedUrl.hostname.includes('duckduckgo.com') && parsedUrl.searchParams.has('uddg')) {
+          url = decodeURIComponent(parsedUrl.searchParams.get('uddg') || url);
+        }
+      } catch (e) {
+        // Ignore URL parsing errors, let it fail below if invalid
+      }
+    }
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(

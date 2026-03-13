@@ -12,7 +12,5 @@ Pillow>=10.0.0
 numpy>=1.24.0
 scipy>=1.10.0
 
-# Optional: SAM3 segmentation (GPU required)
-# torch>=2.0.0
 edge-tts>=6.1.0
 youtube-transcript-api>=1.0.0

@@ -9,15 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@google/genai": "^1.44.0",
+    "@google/genai": "^1.45.0",
     "@prisma/adapter-better-sqlite3": "^7.5.0",
-    "@prisma/client": "^7.4.2",
+    "@prisma/client": "^7.5.0",
     "better-sqlite3": "^12.6.2",
     "cheerio": "^1.2.0",
     "faiss-node": "^0.5.1",
     "lucide-react": "^0.577.0",
     "next": "16.1.6",
-    "prisma": "^7.4.2",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
@@ -34,6 +33,7 @@
     "@types/reveal.js": "^5.2.2",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "prisma": "^7.5.0",
     "typescript": "^5"
   }
 }

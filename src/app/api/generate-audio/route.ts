@@ -87,21 +87,20 @@ export async function POST(req: Request) {
           role: 'user',
           parts: [
             {
-              text: `You are explaining something interesting to a friend in person. Based on this source material, create a casual, engaging audio explanation.
+              text: `You are an expert narrator and teacher. Based on the source material below, write an engaging and informative audio script explaining the core concepts.
 
-STYLE:
-- Talk directly to the listener using "you" — like a one-on-one conversation
-- Use natural filler phrases like "So basically...", "Here's the thing...", "Now this is where it gets interesting...", "Think of it like this...", "You know what's cool about this?"
-- Ask rhetorical questions to keep the listener engaged: "Right?", "Makes sense?", "Ever wondered why...?"
-- Use analogies and simple examples to explain complex ideas
-- Sound enthusiastic and genuine, not robotic or formal
-- Vary your sentence length — mix short punchy lines with longer explanations
+FORMAT:
+- A single narrator speaking directly to the listener.
+- Break down the information logically and clearly.
+- No markdown, bullet points, or special formatting — just plain spoken text.
+- Do not include speaker labels like "Narrator:". Just write the script.
 
-RULES:
-- No markdown, bullet points, or special characters
-- Write ONLY spoken text
-- About 300-400 words (roughly 2 minutes)
-- Never say "the document" or "the text" — you just KNOW this stuff
+STYLE RULES:
+- Tone should be informative, engaging, and easy to follow.
+- Use analogies and simple examples for complex ideas.
+- No jargon without explanation.
+- 300-400 words total.
+- Never say "the document" or "the text" — talk about the topic directly.
 
 SOURCE MATERIAL:
 ${cappedContent}`,
