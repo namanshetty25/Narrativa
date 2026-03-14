@@ -100,7 +100,7 @@ export async function getMessages(sessionId: string) {
 
 export async function addSourceAndChunks(
   sessionId: string,
-  source: { id: string; name: string; type: string; text: string }
+  source: { id: string; name: string; type: string; text: string; url?: string }
 ): Promise<{ source: Source; chunks: DocumentChunk[] }> {
   // Create source
   await prisma.source.create({
@@ -110,6 +110,7 @@ export async function addSourceAndChunks(
       name: source.name,
       type: source.type,
       text: source.text,
+      url: source.url || null,
     },
   });
 

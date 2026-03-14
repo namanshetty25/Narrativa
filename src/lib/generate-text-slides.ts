@@ -53,9 +53,9 @@ const DEFAULT_THEME = {
   bg_alt: '#F8FAFC',
   banner_bg: '#0F172A',
   banner_text: '#FFFFFF',
-  h1_size: 64,
-  h2_size: 40,
-  body_size: 26,
+  h1_size: 52,
+  h2_size: 32,
+  body_size: 22,
   border_radius: '14px',
   shadow: '0 10px 30px rgba(0,0,0,0.1)',
 };
@@ -150,8 +150,8 @@ async function buildNarrativeArc(
 Analyze the following content from ${sourceContext} titled "${sourceName}" and create a structured narrative arc for a BEAUTIFUL, MODERN presentation.
 
 CRITICAL RULES:
-- Create 5-12 logical sections that flow as a coherent story
-- Each section should capture ONE key idea (minimal, not text-heavy)
+- Create 3-6 logical sections that flow as a coherent story. Compress information efficiently.
+- Each section should be packed with value but focused on one major theme.
 - Distill key insights, data points, and compelling facts
 - Each section should flow naturally into the next
 - Suggest a visual type for each section (chart, diagram, illustration, icon, or "none")
@@ -208,8 +208,8 @@ ${sectionsStr}
 
 CRITICAL DESIGN RULES:
 
-1. ONE IDEA PER SLIDE - Never overload.
-2. TEXT LIMITS: Max 6 bullets, 12 words per bullet, 40 words per slide.
+1. INFORMATION DENSITY - Maximize the value of every slide without making it unreadable.
+2. TEXT LIMITS: Max 8-10 bullets, 20-25 words per bullet, 100-150 words per slide total.
 3. TYPOGRAPHY: "# Heading" for headline, "## Subheading" for supporting idea, "- " for bullets.
 4. First slide = hero/title. Last slide = summary/conclusion.
 5. DO NOT include the slide title in the "content" array.

@@ -20,7 +20,7 @@ Narrativa is a full-stack Next.js web application that acts as your personalized
 - **Backend**: Next.js Route Handlers
 - **Database**: Prisma ORM with local SQLite (`dev.db`)
 - **AI Integration**: Google Gemini 2.0 Flash / Pro via `@google/genai`
-- **Asset Processing**: Embedded Python scripts (PyMuPDF, gTTS, LangChain) for handling complex PDF extraction, text-to-speech generation, and slide layouts.
+- **Asset Processing**: Decoupled Python microservice (FastAPI, PyMuPDF, edge-tts, LangChain) for handling complex PDF extraction, text-to-speech generation, and slide layouts.
 
 ---
 
@@ -47,11 +47,14 @@ Install the necessary npm packages for the Next.js application:
 npm install
 ```
 
-### 4. Set Up the Python Virtual Environment
+### 4. Run the Python AI Backend Locally
 
-The application relies on Python scripts (located in the `./scripts/` and root directories) for heavy document processing and TTS.
+The Next.js application requires a running instance of the Python backend (FastAPI) to handle PDF processing and TTS.
 
 ```bash
+# Navigate to the Python backend directory
+cd python_backend
+
 # Create a virtual environment
 python -m venv .venv
 
@@ -61,8 +64,11 @@ python -m venv .venv
 # On macOS/Linux:
 source .venv/bin/activate
 
-# Install Python requirements
+# Install requirements
 pip install -r requirements.txt
+
+# Start the FastAPI server (runs on port 8000)
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ### 5. Setup Environment Variables
@@ -78,15 +84,21 @@ GOOGLE_API_KEY="your_api_key_here"
 # Optional alias if you prefer
 GEMINI_API_KEY="your_api_key_here"
 
-# Database URL for Prisma (SQLite)
-DATABASE_URL="file:./dev.db"
+# Database URL for Prisma (Neon Postgres, Supabase, etc.)
+DATABASE_URL="postgresql://..."
+
+# Remote Python API URL (leave blank for localhost:8000 during dev)
+PYTHON_API_URL="http://localhost:8000"
+
+# (Optional) Vercel Blob Token for storing generated Slides/Audio in production
+BLOB_READ_WRITE_TOKEN="..."
 ```
 
 *Note: You can get your API key from [Google AI Studio](https://aistudio.google.com/apikey).*
 
 ### 6. Initialize the Database
 
-Use Prisma to push the schema and create your local SQLite database (`dev.db`):
+Use Prisma to push the schema and connect to your database:
 
 ```bash
 npx prisma db push
@@ -113,10 +125,10 @@ Narrativa/
 │   ├── lib/                 # Shared utilities (store.ts, vector-store.ts, web-search.ts)
 │   └── components/          # Reusable UI components
 ├── prisma/                  # Prisma schema definition
-├── scripts/                 # Python utilities (TTS, etc.)
-├── .venv/                   # Python virtual environment (ignored in git)
-├── .audio/                  # Generated MP3 assets (ignored in git)
-└── .data/                   # local vector embeddings (ignored in git)
+├── scripts/                 # Legacy utilities
+├── python_backend/          # Standalone FastAPI service (for deployment on Render/Railway)
+├── .audio/                  # Generated MP3 assets (local development fallback)
+└── .data/                   # Vector embeddings and raw PDF uploads (local development fallback)
 ```
 
 ## Contributing

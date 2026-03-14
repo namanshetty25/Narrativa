@@ -5,49 +5,7 @@ import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
 
-const AUDIO_DIR = path.join(process.cwd(), '.audio');
-
-// Ensure audio directory exists
-if (!fs.existsSync(AUDIO_DIR)) {
-  fs.mkdirSync(AUDIO_DIR, { recursive: true });
-}
-
-/**
- * Spawn Python gTTS process, pipe script text via stdin, wait for MP3 output.
- */
-function runTTS(scriptText: string, outputPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const pythonScript = path.join(process.cwd(), 'scripts', 'tts.py');
-
-    const pythonExecutable = path.join(process.cwd(), '.' + 'venv', process.platform === 'win32' ? 'Scripts' : 'bin', process.platform === 'win32' ? 'python.exe' : 'python');
-    const proc = spawn(pythonExecutable, [pythonScript, outputPath], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-      timeout: 120000,
-    });
-
-    let stderr = '';
-
-    proc.stderr.on('data', (data) => {
-      stderr += data.toString();
-    });
-
-    proc.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`TTS process exited with code ${code}: ${stderr}`));
-      }
-    });
-
-    proc.on('error', (err) => {
-      reject(new Error(`Failed to start TTS process: ${err.message}`));
-    });
-
-    proc.stdin.write(scriptText);
-    proc.stdin.end();
-  });
-}
+// Decoupled Python execution via FastAPI
 
 export async function POST(req: Request) {
   try {
@@ -121,27 +79,47 @@ ${cappedContent}`,
       );
     }
 
-    console.log(`✅ Script generated (${script.length} chars). Converting to audio via gTTS...`);
+    console.log(`✅ Script generated (${script.length} chars). Converting to audio via FastAPI backend...`);
 
     const audioId = crypto.randomUUID();
-    const audioFilePath = path.join(AUDIO_DIR, `${audioId}.mp3`);
+    const backendUrl = process.env.PYTHON_API_URL || 'http://localhost:8000';
+    
+    const formData = new FormData();
+    formData.append('text', script);
 
-    await runTTS(script, audioFilePath);
+    const apiResponse = await fetch(`${backendUrl}/api/generate-audio`, {
+      method: 'POST',
+      body: formData,
+    });
 
-    if (!fs.existsSync(audioFilePath)) {
-      return NextResponse.json(
-        { error: 'Audio generation failed — file not created.' },
-        { status: 500 }
-      );
+    if (!apiResponse.ok) {
+      const errorData = await apiResponse.json().catch(() => ({}));
+      throw new Error(`Python API failed: ${errorData.error || apiResponse.statusText}`);
     }
 
-    const stat = fs.statSync(audioFilePath);
-    console.log(`✅ Audio file created: ${audioFilePath} (${(stat.size / 1024).toFixed(1)} KB)`);
+    const audioBuffer = Buffer.from(await apiResponse.arrayBuffer());
+
+    // Upload to Vercel blob
+    let audioUrl = `/api/audio/${audioId}`; // fallback
+    try {
+      const { put } = await import('@vercel/blob');
+      const blob = await put(`audio/${audioId}.mp3`, audioBuffer, { access: 'public' });
+      audioUrl = blob.url;
+      console.log(`✅ Audio uploaded to Vercel Blob: ${audioUrl}`);
+    } catch (e) {
+      console.error('Failed to upload Audio to Vercel Blob (is BLOB_READ_WRITE_TOKEN set?):', e);
+      // Fallback: Save audio locally if Blob fails
+      const fs = await import('fs');
+      const path = await import('path');
+      const audioDir = path.join(process.cwd(), '.audio');
+      if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+      fs.writeFileSync(path.join(audioDir, `${audioId}.mp3`), audioBuffer);
+    }
 
     return NextResponse.json({
       success: true,
       audioId,
-      audioUrl: `/api/audio/${audioId}`,
+      audioUrl,
       script,
     });
   } catch (error: unknown) {

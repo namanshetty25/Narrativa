@@ -18,7 +18,7 @@ You have access to these tools:
 2. detect_assets — Detect additional visual elements (charts, diagrams) not already extracted as embedded images
 3. extract_tables — Detect and extract tables from a page as structured HTML
 4. process_asset — Crop a VLM-detected asset from the page image as a PNG
-5. plan_slides — Plan 1-4 slides from page content, assets, and tables (theme is applied automatically)
+5. plan_slides — Plan 1-3 slides from page content, assets, and tables (theme is applied automatically)
 6. bundle_slides — Bundle all slide plans into a single deck.json file for Reveal.js
 
 WORKFLOW for each page:

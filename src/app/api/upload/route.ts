@@ -56,25 +56,41 @@ export async function POST(req: NextRequest) {
     if (!text.trim()) {
       return NextResponse.json({ error: 'Could not extract text from file' }, { status: 400 });
     }
+    const sourceId = crypto.randomUUID();
+    const sourceType = file.name.endsWith('.pdf') ? 'pdf' : 'txt';
 
-    // Add source and create chunks (now linked to session)
-    const { source, chunks } = await addSourceAndChunks(sessionId, {
-      id: crypto.randomUUID(),
-      name: file.name,
-      type: file.name.endsWith('.pdf') ? 'pdf' : 'txt',
-      text: text,
-    });
+    let fileUrl: string | undefined;
 
-    // Save the PDF locally for the slide generator
-    if (source.type === 'pdf') {
+    // Save the PDF locally for fallback AND upload to Vercel Blob
+    if (sourceType === 'pdf') {
       const fs = await import('fs');
       const path = await import('path');
       const uploadDir = path.join(process.cwd(), '.data', 'uploads');
       if (!fs.existsSync(uploadDir)) {
         fs.mkdirSync(uploadDir, { recursive: true });
       }
-      fs.writeFileSync(path.join(uploadDir, `${source.id}.pdf`), buffer);
+      const localPath = path.join(uploadDir, `${sourceId}.pdf`);
+      fs.writeFileSync(localPath, buffer);
+
+      // Upload to Vercel Blob
+      try {
+        const { put } = await import('@vercel/blob');
+        const blob = await put(`uploads/${sourceId}.pdf`, buffer, { access: 'public' });
+        fileUrl = blob.url;
+        console.log(`✅ Uploaded PDF to Vercel Blob: ${fileUrl}`);
+      } catch (e) {
+        console.error('Failed to upload PDE to Vercel Blob (is BLOB_READ_WRITE_TOKEN set?):', e);
+      }
     }
+
+    // Add source and create chunks (now linked to session and with Blob URL)
+    const { source: savedSource, chunks } = await addSourceAndChunks(sessionId, {
+      id: sourceId,
+      name: file.name,
+      type: sourceType,
+      text: text,
+      url: fileUrl,
+    });
 
     // Generate embeddings for all chunks and persist them
     try {
@@ -90,7 +106,7 @@ export async function POST(req: NextRequest) {
       console.error('Failed to generate embeddings (chunks stored without embeddings):', embeddingError);
     }
 
-    return NextResponse.json({ success: true, source: { id: source.id, name: source.name, type: source.type } });
+    return NextResponse.json({ success: true, source: { id: savedSource.id, name: savedSource.name, type: savedSource.type } });
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Upload Error:', error);

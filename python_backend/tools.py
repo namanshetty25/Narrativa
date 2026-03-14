@@ -389,9 +389,9 @@ DEFAULT_THEME = {
     "bg_alt": "#F8FAFC",
     "banner_bg": "#0F172A",
     "banner_text": "#FFFFFF",
-    "h1_size": 64,
-    "h2_size": 40,
-    "body_size": 26,
+    "h1_size": 52,
+    "h2_size": 32,
+    "body_size": 22,
     "border_radius": "14px",
     "shadow": "0 10px 30px rgba(0,0,0,0.1)",
 }
@@ -440,17 +440,17 @@ def plan_slides(page_text: str, assets_json: str, tables_json: str) -> str:
 
 Your task is to convert a textbook page into BEAUTIFUL presentation slides.
 
-GOAL: Slides must be visually clean, modern, minimal, and engaging.
+GOAL: Condense the material efficiently. You MUST cover the ENTIRE page text in NO MORE THAN 1 TO 3 SLIDES. Do NOT generate more than 3 slides for this page content.
 
 CRITICAL DESIGN RULES:
 
-1. ONE IDEA PER SLIDE - Never overload slides.
+1. INFORMATION DENSITY - Maximize the value of every slide without making it unreadable.
 
 2. TEXT LIMITS{' (relaxed since no images available)' if not has_assets else ''}
    Maximum per slide:
-   - {'8' if not has_assets else '6'} bullet points
-   - {'18' if not has_assets else '12'} words per bullet
-   - {'80' if not has_assets else '40'} words per slide total
+   - {'12' if not has_assets else '8'} bullet points
+   - {'25' if not has_assets else '18'} words per bullet
+   - {'150' if not has_assets else '90'} words per slide total
 
 3. VISUAL PRIORITY
    {'Since NO images are available, use rich text hierarchy with headings, subheadings, and bullets to create visual interest.' if not has_assets else 'Images and diagrams should dominate. Text SUPPORTS visuals.'}

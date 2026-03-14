@@ -36,6 +36,7 @@ model Source {
   name      String
   type      String
   text      String
+  url       String?
   createdAt DateTime @default(now())
 
   session Session         @relation(fields: [sessionId], references: [id], onDelete: Cascade)
