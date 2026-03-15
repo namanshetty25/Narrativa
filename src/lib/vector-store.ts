@@ -1,112 +1,123 @@
+/**
+ * vector-store.ts
+ *
+ * Pure-JS in-memory vector store using cosine similarity search.
+ * Replaces faiss-node (which requires native C++ bindings that can't run on Vercel serverless).
+ *
+ * This is a drop-in replacement — same API surface (initVectorStore, addVectors, searchVector, saveVectorStore).
+ * Performance is fine for per-session RAG with hundreds to low thousands of chunks.
+ */
+
 import fs from 'fs';
 import path from 'path';
-import { IndexFlatL2 } from 'faiss-node';
 
 const DATA_DIR = process.env.VERCEL ? '/tmp/.data' : path.join(process.cwd(), '.data');
-const FAISS_INDEX_FILE = path.join(DATA_DIR, 'vector.index');
-const MAP_FILE = path.join(DATA_DIR, 'vector_map.json');
-const EMBEDDING_DIMENSION = 3072; // gemini-embedding-001 dimension
+const VECTORS_FILE = path.join(DATA_DIR, 'vectors.json');
 
 // Ensure directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-let faissIndex: IndexFlatL2 | null = null;
-let idToChunkIdMap: string[] = [];
+interface StoredVector {
+  chunkId: string;
+  embedding: number[];
+}
+
+let vectors: StoredVector[] = [];
+let initialized = false;
 
 /**
- * Initialize or load the FAISS index
+ * Initialize or load the vector store
  */
 export function initVectorStore() {
-  if (faissIndex) return;
-  
+  if (initialized) return;
+
   try {
-    if (fs.existsSync(FAISS_INDEX_FILE)) {
-      faissIndex = IndexFlatL2.read(FAISS_INDEX_FILE);
-      if (fs.existsSync(MAP_FILE)) {
-        idToChunkIdMap = JSON.parse(fs.readFileSync(MAP_FILE, 'utf-8'));
-      }
+    if (fs.existsSync(VECTORS_FILE)) {
+      const raw = fs.readFileSync(VECTORS_FILE, 'utf-8');
+      vectors = JSON.parse(raw);
     } else {
-      faissIndex = new IndexFlatL2(EMBEDDING_DIMENSION);
-      idToChunkIdMap = [];
+      vectors = [];
     }
   } catch (err) {
-    console.error('Failed to init FAISS index, creating new one', err);
-    faissIndex = new IndexFlatL2(EMBEDDING_DIMENSION);
-    idToChunkIdMap = [];
+    console.error('Failed to load vector store, creating new one', err);
+    vectors = [];
   }
+
+  initialized = true;
 }
 
 /**
- * Save index to disk
+ * Save vectors to disk
  */
 export function saveVectorStore() {
-  if (!faissIndex) return;
-  faissIndex.write(FAISS_INDEX_FILE);
-  fs.writeFileSync(MAP_FILE, JSON.stringify(idToChunkIdMap), 'utf-8');
+  try {
+    fs.writeFileSync(VECTORS_FILE, JSON.stringify(vectors), 'utf-8');
+  } catch (err) {
+    console.warn('Failed to persist vector store (non-critical on Vercel):', err);
+  }
 }
 
 /**
- * Add chunks to the FAISS index
- * 
- * @param embeddings Array of number arrays (the vectors)
- * @param chunkIds Array of internal chunk IDs corresponding to the embeddings
+ * Add chunks to the vector store
  */
 export function addVectors(embeddings: number[][], chunkIds: string[]) {
-  if (!faissIndex) initVectorStore();
-  
-  // Flatten vectors into a 1D Float32Array
-  const numVectors = embeddings.length;
-  if (numVectors === 0) return;
-  
-  const flattened = new Float32Array(numVectors * EMBEDDING_DIMENSION);
-  for (let i = 0; i < numVectors; i++) {
-    for (let j = 0; j < EMBEDDING_DIMENSION; j++) {
-      flattened[i * EMBEDDING_DIMENSION + j] = embeddings[i][j];
-    }
+  initVectorStore();
+
+  for (let i = 0; i < embeddings.length; i++) {
+    vectors.push({
+      chunkId: chunkIds[i],
+      embedding: embeddings[i],
+    });
   }
-  
-  // Add to FAISS and map the local ID
-  // faiss-node bindings generally expect standard arrays, not typed arrays, based on definitions
-  const vectorArray = Array.from(flattened);
-  faissIndex!.add(vectorArray);
-  
-  // Since faiss assigns incremental integer IDs starting from the current size,
-  // we just push our UUID string IDs into an array in identical order to map back.
-  idToChunkIdMap.push(...chunkIds);
-  
+
   saveVectorStore();
 }
 
 /**
- * Search the FAISS index for the k nearest neighbors
- * 
- * @param queryEmbedding A single query embedding vector
- * @param topK Number of results to return
- * @returns Array of matching chunk string IDs
+ * Cosine similarity between two vectors
+ */
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denominator === 0) return 0;
+
+  return dotProduct / denominator;
+}
+
+/**
+ * Search the vector store for the k nearest neighbors using cosine similarity
  */
 export function searchVector(queryEmbedding: number[], topK: number = 5): string[] {
-  if (!faissIndex || faissIndex.ntotal() === 0) return [];
-  
-  const queryArray = Array.from(new Float32Array(queryEmbedding));
-  
+  if (vectors.length === 0) return [];
+
   try {
-    // Prevent FAISS error: topK cannot exceed total items in index
-    const actualK = Math.min(topK, faissIndex.ntotal());
-    const results = faissIndex.search(queryArray, actualK);
-    
-    const matchingChunkIds: string[] = [];
-    for (let i = 0; i < results.labels.length; i++) {
-      const idxId = results.labels[i];
-      if (idxId !== -1 && idxId < idToChunkIdMap.length) {
-        matchingChunkIds.push(idToChunkIdMap[idxId]);
-      }
-    }
-    
-    return matchingChunkIds;
+    // Compute similarity scores for all stored vectors
+    const scored = vectors.map((v) => ({
+      chunkId: v.chunkId,
+      score: cosineSimilarity(queryEmbedding, v.embedding),
+    }));
+
+    // Sort by similarity (highest first) and take topK
+    scored.sort((a, b) => b.score - a.score);
+
+    return scored
+      .slice(0, topK)
+      .map((s) => s.chunkId);
   } catch (e) {
-    console.error("FAISS search error", e);
+    console.error('Vector search error', e);
     return [];
   }
 }
