@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { IndexFlatL2 } from 'faiss-node';
 
-const DATA_DIR = path.join(process.cwd(), '.data');
+const DATA_DIR = process.env.VERCEL ? '/tmp/.data' : path.join(process.cwd(), '.data');
 const FAISS_INDEX_FILE = path.join(DATA_DIR, 'vector.index');
 const MAP_FILE = path.join(DATA_DIR, 'vector_map.json');
 const EMBEDDING_DIMENSION = 3072; // gemini-embedding-001 dimension

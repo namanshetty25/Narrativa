@@ -61,25 +61,30 @@ export async function POST(req: NextRequest) {
 
     let fileUrl: string | undefined;
 
-    // Save the PDF locally for fallback AND upload to Vercel Blob
+    // Save the PDF: Vercel Blob for production, /tmp for local/fallback
     if (sourceType === 'pdf') {
-      const fs = await import('fs');
-      const path = await import('path');
-      const uploadDir = path.join(process.cwd(), '.data', 'uploads');
-      if (!fs.existsSync(uploadDir)) {
-        fs.mkdirSync(uploadDir, { recursive: true });
-      }
-      const localPath = path.join(uploadDir, `${sourceId}.pdf`);
-      fs.writeFileSync(localPath, buffer);
-
-      // Upload to Vercel Blob
+      // Try Vercel Blob first (production)
       try {
         const { put } = await import('@vercel/blob');
         const blob = await put(`uploads/${sourceId}.pdf`, buffer, { access: 'public' });
         fileUrl = blob.url;
         console.log(`✅ Uploaded PDF to Vercel Blob: ${fileUrl}`);
       } catch (e) {
-        console.error('Failed to upload PDE to Vercel Blob (is BLOB_READ_WRITE_TOKEN set?):', e);
+        console.error('Vercel Blob upload failed (is BLOB_READ_WRITE_TOKEN set?):', e);
+      }
+
+      // Local fallback: save to /tmp (works on both Vercel and local dev)
+      try {
+        const fs = await import('fs');
+        const path = await import('path');
+        const uploadDir = process.env.VERCEL ? '/tmp/uploads' : path.join(process.cwd(), '.data', 'uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
+        }
+        const localPath = path.join(uploadDir, `${sourceId}.pdf`);
+        fs.writeFileSync(localPath, buffer);
+      } catch (fsErr) {
+        console.warn('Local PDF save failed (non-critical if Blob succeeded):', fsErr);
       }
     }
 

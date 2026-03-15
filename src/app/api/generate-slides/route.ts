@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
         ? `Topic: ${topic}\n\nThe following research was gathered from academic papers and authoritative sources. Use this information to create factual, well-cited slides. Include a "References" slide at the end.\n\n${researchContext}`
         : topic;
 
-      const outputDir = path.join(process.cwd(), 'public', 'slides', `topic-${Date.now()}`);
+      const outputDir = process.env.VERCEL
+        ? path.join('/tmp', 'slides', `topic-${Date.now()}`)
+        : path.join(process.cwd(), 'public', 'slides', `topic-${Date.now()}`);
       const deck = await generateSlidesFromText(
         slideText,
         topic.length > 60 ? topic.substring(0, 57) + '...' : topic,
@@ -105,7 +107,9 @@ export async function POST(req: NextRequest) {
       .join('\n\n');
 
     const primarySource = sources[0];
-    const outputDir = path.join(process.cwd(), 'public', 'slides', primarySource.id);
+    const outputDir = process.env.VERCEL
+      ? path.join('/tmp', 'slides', primarySource.id)
+      : path.join(process.cwd(), 'public', 'slides', primarySource.id);
 
     const deck = await generateSlidesFromText(
       combinedText,
@@ -148,8 +152,9 @@ async function handlePdfSlides(sourceId: string, sessionId: string, pdfUrl?: str
       }
       pdfBuffer = await pdfResponse.arrayBuffer();
     } else {
-      // Fallback: Read from local filesystem if Blob URL isn't set
-      const localPdfPath = path.join(process.cwd(), '.data', 'uploads', `${sourceId}.pdf`);
+      // Fallback: Read from local filesystem (/tmp on Vercel, .data locally)
+      const uploadDir = process.env.VERCEL ? '/tmp/uploads' : path.join(process.cwd(), '.data', 'uploads');
+      const localPdfPath = path.join(uploadDir, `${sourceId}.pdf`);
       if (!fs.existsSync(localPdfPath)) {
         throw new Error('PDF file not found in Blob or local storage.');
       }
@@ -186,7 +191,9 @@ async function handlePdfSlides(sourceId: string, sessionId: string, pdfUrl?: str
 
     // 4. Upload to Vercel Blob (or fallback to local public directory)
     const uploadPromises: Promise<void>[] = [];
-    const localOutputDir = path.join(process.cwd(), 'public', 'slides', sourceId);
+    const localOutputDir = process.env.VERCEL
+      ? path.join('/tmp', 'slides', sourceId)
+      : path.join(process.cwd(), 'public', 'slides', sourceId);
 
     // Read the exact Vercel Blob Token status
     const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN;

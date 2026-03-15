@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs';
 
-const AUDIO_DIR = path.join(process.cwd(), '.audio');
+const AUDIO_DIR = process.env.VERCEL ? '/tmp/.audio' : path.join(process.cwd(), '.audio');
 
 export async function GET(
   _req: NextRequest,

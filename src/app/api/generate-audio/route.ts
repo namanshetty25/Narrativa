@@ -111,7 +111,7 @@ ${cappedContent}`,
       // Fallback: Save audio locally if Blob fails
       const fs = await import('fs');
       const path = await import('path');
-      const audioDir = path.join(process.cwd(), '.audio');
+      const audioDir = process.env.VERCEL ? '/tmp/.audio' : path.join(process.cwd(), '.audio');
       if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
       fs.writeFileSync(path.join(audioDir, `${audioId}.mp3`), audioBuffer);
     }
