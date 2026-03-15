@@ -479,7 +479,7 @@ CRITICAL DESIGN RULES:
    - comparison: Two columns for comparing concepts
    - step_process: 3-4 steps shown horizontally
    - full_image: Full background image with overlay text
-   - text_only: Full text, no assets - {'USE THIS with rich formatting' if not has_assets else 'ONLY when no assets exist'}
+   {' ' if has_assets else '- text_only: Full text, no assets - USE THIS with rich formatting'}
 
 7. TABLE RULES
    If tables exist, convert into visual comparison slides or include HTML table.

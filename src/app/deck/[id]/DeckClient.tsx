@@ -98,9 +98,14 @@ export default function DeckClient({ deck, sourceId }: { deck: DeckData, sourceI
 
   // Renderer for Layout Types
   const renderSlideLayout = (slide: SlidePlan) => {
-    const layout = slide.layout || 'text_only';
+    let layout = slide.layout || 'text_only';
     const content = renderContent(slide.content);
     const images = slide.images || [];
+
+    // Force an image layout if the agent sent images but picked text_only
+    if (images.length > 0 && layout === 'text_only') {
+      layout = 'text_left_image_right_medium';
+    }
 
     if (layout === 'full_image' && images.length > 0) {
       return (
