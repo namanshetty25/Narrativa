@@ -62,6 +62,20 @@ export async function POST(req: NextRequest) {
       );
 
       const slideId = path.basename(outputDir);
+
+      // Save to database artifact so the deck viewer can load it on Vercel
+      if (sessionId) {
+        const { saveArtifact } = await import('@/lib/store');
+        await saveArtifact(sessionId, {
+          id: slideId,
+          type: 'slides',
+          label: `Topic: ${topic.length > 40 ? topic.substring(0, 37) + '...' : topic}`,
+          sourceIds: [],
+          content: JSON.stringify(deck),
+          timestamp: Date.now(),
+        });
+      }
+
       return NextResponse.json({
         success: true,
         slideUrl: `/deck/${slideId}`,
@@ -117,6 +131,19 @@ export async function POST(req: NextRequest) {
       primarySource.type,
       outputDir,
     );
+
+    // Save to database artifact so the deck viewer can load it on Vercel
+    if (sessionId) {
+      const { saveArtifact } = await import('@/lib/store');
+      await saveArtifact(sessionId, {
+        id: primarySource.id,
+        type: 'slides',
+        label: `Slides: ${primarySource.name}`,
+        sourceIds: idsToProcess,
+        content: JSON.stringify(deck),
+        timestamp: Date.now(),
+      });
+    }
 
     return NextResponse.json({
       success: true,

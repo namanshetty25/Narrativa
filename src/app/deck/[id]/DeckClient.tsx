@@ -87,8 +87,13 @@ export default function DeckClient({ deck, sourceId }: { deck: DeckData, sourceI
   };
 
   // Helper to get image URL from path
-  const getImageUrl = (filename: string) => {
-    return `/slides/${sourceId}/assets/${filename}`;
+  // On production, images are Vercel Blob URLs (full https://... URLs)
+  // On local dev, images are relative filenames served from /slides/
+  const getImageUrl = (filepath: string) => {
+    if (filepath.startsWith('http://') || filepath.startsWith('https://')) {
+      return filepath; // Already a full Blob URL
+    }
+    return `/slides/${sourceId}/assets/${filepath}`;
   };
 
   // Renderer for Layout Types
