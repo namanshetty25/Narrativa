@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Headphones, FileBarChart, Presentation, BookOpen, Search, Trash2, Clock, Sparkles } from 'lucide-react';
+import { Plus, FileText, Headphones, FileBarChart, Presentation, BookOpen, Search, Trash2, Clock, Sparkles, PlayCircle } from 'lucide-react';
 import styles from './page.module.css';
 
 type Session = {
@@ -124,6 +124,16 @@ export default function LandingPage() {
           <p className={styles.heroSubtitle}>
             Upload documents, ask questions, and let AI generate summaries, podcasts, slides, and research reports — all from your sources.
           </p>
+          
+          <div className={styles.heroActions}>
+            <button className={styles.heroPrimaryBtn} onClick={() => window.scrollTo({ top: window.innerHeight * 0.6, behavior: 'smooth' })}>
+              Get Started
+            </button>
+            <a href="https://youtu.be/v3lkLRfNYYA" target="_blank" rel="noopener noreferrer" className={styles.heroSecondaryBtn}>
+              <PlayCircle size={18} />
+              <span>Watch Demo</span>
+            </a>
+          </div>
         </div>
       </section>
 
