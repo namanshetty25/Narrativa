@@ -9,6 +9,12 @@ type Paper = {
   snippet: string;
 };
 
+export async function GET() {
+  return NextResponse.json({
+    message: "Generate report API is running. Use POST to generate a report."
+  });
+}
+
 export async function POST(req: Request) {
   try {
     const apiKey = process.env.GOOGLE_API_KEY;
