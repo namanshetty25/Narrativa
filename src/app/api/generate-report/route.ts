@@ -21,15 +21,9 @@ export async function POST(req: Request) {
 
     const { topic, sessionId } = await req.json();
 
-    if (!topic || !topic.trim()) {
+    if (!topic || typeof topic !== 'string' || !topic.trim()) {
       return NextResponse.json(
         { error: 'Topic is required.' },
-        { status: 400 }
-      );
-    }
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'sessionId is required.' },
         { status: 400 }
       );
     }
@@ -133,14 +127,16 @@ ${paperContext}`,
 
     console.log(`✅ Research report generated (${reportContent.length} chars)`);
 
-    // 5. Save to database
+    // 5. Save to database (only if called from Notebook UI with a sessionId)
     const reportId = crypto.randomUUID();
-    await saveResearchReport(sessionId, {
-      id: reportId,
-      topic: topic.trim(),
-      content: reportContent,
-      papers: papers.map(p => ({ title: p.title, url: p.url, snippet: p.snippet })),
-    });
+    if (sessionId) {
+      await saveResearchReport(sessionId, {
+        id: reportId,
+        topic: topic.trim(),
+        content: reportContent,
+        papers: papers.map((p: Paper) => ({ title: p.title, url: p.url, snippet: p.snippet })),
+      });
+    }
 
     return NextResponse.json({
       success: true,
