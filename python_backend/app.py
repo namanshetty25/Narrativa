@@ -16,12 +16,18 @@ from tts import generate_speech
 app = FastAPI(title="Narrativa AI Python API")
 
 # Enable CORS for Next.js frontend
+allowed_origins = os.environ.get("FRONTEND_URL", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/")
+async def health_check():
+    """Health check endpoint for hosting platform uptime monitoring."""
+    return {"status": "ok", "service": "narrativa-python-api"}
 
 def remove_temp_file(path: str):
     """Background task to remove temporary files/directories after response."""

@@ -1,135 +1,235 @@
-# Narrativa: AI-Powered Research Notebook
+# Narrativa — AI-Powered Research Notebook
 
-Narrativa is a full-stack Next.js web application that acts as your personalized AI research assistant (inspired by Google's NotebookLM). You can upload documents, web links, and YouTube videos, and let the AI generate audio podcasts, executive summaries, presentation slides, and deep-dive research reports based on your sources.
+Narrativa is a full-stack web application that acts as your personalized AI research assistant (inspired by Google NotebookLM). Upload documents, paste web links, or add YouTube videos as sources — then let the AI generate audio podcasts, executive summaries, presentation slides, and deep-dive research reports from your knowledge base.
 
-## Features
-
-- **2-Page Architecture**: A stunning, animated landing page and a dedicated 3-panel workspace for your research logic.
-- **Source Management**: Upload PDFs, paste YouTube URLs, or link to web pages to build a knowledge base for your notebook.
-- **Chat Interface**: Ask questions against your specific sources. The AI will respond with precise, inline citations (e.g., `[Source-1]`).
-- **5 Studio Tools**: 
-  - 🎧 **Audio Overview**: Generates a conversational podcast explaining your sources using TTS.
-  - 📊 **Executive Summary**: Creates a structured, one-page overview with key findings.
-  - 🎨 **Slides Generator**: Turns your documents into beautiful, presentation-ready slide decks.
-  - 📽️ **Topic to Slides**: Researches any web topic to create data-driven presentations.
-  - 📚 **Research Report**: Writes a comprehensive, strictly-formatted academic report with references.
-
-## Tech Stack
-
-- **Frontend**: Next.js 14+ (App Router), React, CSS Modules, Lucide Icons
-- **Backend**: Next.js Route Handlers
-- **Database**: Prisma ORM with local SQLite (`dev.db`)
-- **AI Integration**: Google Gemini 2.0 Flash / Pro via `@google/genai`
-- **Asset Processing**: Decoupled Python microservice (FastAPI, PyMuPDF, edge-tts, LangChain) for handling complex PDF extraction, text-to-speech generation, and slide layouts.
+![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?logo=python)
+![Gemini](https://img.shields.io/badge/Google_Gemini-2.5-4285F4?logo=google)
+![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma)
 
 ---
 
-## 🚀 Setup Instructions
+## ✨ Features
 
-### 1. Prerequisites
+- **3-Panel Workspace** — Animated landing page + dedicated research notebook with sources panel, chat, and studio tools
+- **Source Management** — Upload PDFs, paste YouTube URLs, or link to web pages to build a per-session knowledge base
+- **Chat with Citations** — Ask questions against your sources; the AI responds with precise, inline citations (e.g., `[Source-1]`)
+- **5 Studio Tools:**
+  | Tool | Description |
+  |------|-------------|
+  | 🎧 Audio Overview | Generates a conversational podcast explaining your sources via TTS |
+  | 📊 Executive Summary | Creates a structured one-page overview with key findings |
+  | 🎨 Slides Generator | Converts PDFs into beautiful Reveal.js presentation slides |
+  | 📽️ Topic to Slides | Researches any web topic and creates data-driven presentations |
+  | 📚 Research Report | Writes a comprehensive academic report with references |
 
-You must have the following installed on your machine:
-- **Node.js**: (v18 or higher)
-- **Python**: (3.10 or higher) for local PDF parsing and TTS generation.
+---
 
-### 2. Clone the Repository
+## 🏗️ Architecture
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                         Vercel (Frontend)                        │
+│  ┌────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
+│  │  Next.js   │  │  API Routes  │  │  FAISS Vector Store    │   │
+│  │  React UI  │──│  (Route      │──│  (in-memory, ephemeral │   │
+│  │  App Router│  │   Handlers)  │  │   per cold start)      │   │
+│  └────────────┘  └──────┬───────┘  └────────────────────────┘   │
+│                         │                                        │
+│              ┌──────────┴──────────┐                             │
+│              │  Prisma ORM         │                             │
+│              │  (Sessions, Sources,│                             │
+│              │   Chunks, Artifacts)│                             │
+│              └──────────┬──────────┘                             │
+└─────────────────────────┼────────────────────────────────────────┘
+                          │
+              ┌───────────┴───────────┐
+              │   Neon PostgreSQL     │
+              │   (Persistent DB)     │
+              └───────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────┐
+│                    Render / Railway (Python Backend)              │
+│  ┌────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
+│  │  FastAPI    │  │  LangGraph   │  │  edge-tts              │   │
+│  │  Endpoints  │──│  Agent       │──│  Text-to-Speech        │   │
+│  │  /api/*     │  │  (PDF→Slides)│  │  Audio Generation      │   │
+│  └────────────┘  └──────────────┘  └────────────────────────┘   │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | Next.js 16 (App Router), React 19, CSS Modules, Lucide Icons |
+| **Backend API** | Next.js Route Handlers |
+| **Database** | Prisma ORM → Neon PostgreSQL |
+| **AI** | Google Gemini 2.5 Flash / Pro via `@google/genai` |
+| **Vector Search** | FAISS (`faiss-node`) for RAG-style retrieval |
+| **Embeddings** | Gemini Embedding API (3072-dim) |
+| **Python Service** | FastAPI, LangGraph Agent, PyMuPDF, edge-tts |
+| **File Storage** | Vercel Blob (production) / local `.audio/` + `.data/` (dev) |
+| **Slides Engine** | Reveal.js |
+
+---
+
+## 🚀 Local Development Setup
+
+### Prerequisites
+
+- **Node.js** v18+ and npm
+- **Python** 3.10+
+- A [Google Gemini API key](https://aistudio.google.com/apikey)
+- A PostgreSQL database ([Neon](https://neon.tech) free tier recommended)
+
+### 1. Clone & Install
 
 ```bash
 git clone <repository-url>
-cd Narrativa
-```
+cd Neurals
 
-### 3. Install Node Dependencies
-
-Install the necessary npm packages for the Next.js application:
-
-```bash
+# Install Node.js dependencies
 npm install
 ```
 
-### 4. Run the Python AI Backend Locally
-
-The Next.js application requires a running instance of the Python backend (FastAPI) to handle PDF processing and TTS.
+### 2. Configure Environment
 
 ```bash
-# Navigate to the Python backend directory
-cd python_backend
-
-# Create a virtual environment
-python -m venv .venv
-
-# Activate the virtual environment
-# On Windows:
-.venv\Scripts\activate
-# On macOS/Linux:
-source .venv/bin/activate
-
-# Install requirements
-pip install -r requirements.txt
-
-# Start the FastAPI server (runs on port 8000)
-uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+cp .env.example .env
 ```
 
-### 5. Setup Environment Variables
+Edit `.env` and fill in your values:
 
-Create a new file named `.env` in the root directory (you can copy `.env.example` if it exists).
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | ✅ | Google Gemini API key |
+| `GOOGLE_API_KEY` | ✅ | Same Gemini key (used by `@google/genai`) |
+| `DATABASE_URL` | ✅ | PostgreSQL connection string |
+| `PYTHON_API_URL` | ❌ | Python backend URL (defaults to `http://localhost:8000`) |
+| `BLOB_READ_WRITE_TOKEN` | ❌ | Vercel Blob token (production only) |
 
-```bash
-# .env
-
-# Your Google Gemini API Key
-GOOGLE_API_KEY="your_api_key_here"
-
-# Optional alias if you prefer
-GEMINI_API_KEY="your_api_key_here"
-
-# Database URL for Prisma (Neon Postgres, Supabase, etc.)
-DATABASE_URL="postgresql://..."
-
-# Remote Python API URL (leave blank for localhost:8000 during dev)
-PYTHON_API_URL="http://localhost:8000"
-
-# (Optional) Vercel Blob Token for storing generated Slides/Audio in production
-BLOB_READ_WRITE_TOKEN="..."
-```
-
-*Note: You can get your API key from [Google AI Studio](https://aistudio.google.com/apikey).*
-
-### 6. Initialize the Database
-
-Use Prisma to push the schema and connect to your database:
+### 3. Initialize Database
 
 ```bash
 npx prisma db push
 ```
 
-### 7. Run the Development Server
-
-Start the Next.js development server:
+### 4. Start the Python Backend
 
 ```bash
+cd python_backend
+
+# Create and activate virtual environment
+python -m venv .venv
+
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+# source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the FastAPI server
+uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 5. Start the Next.js Dev Server
+
+```bash
+# From the repo root
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to explore the application!
+Open [http://localhost:3000](http://localhost:3000) 🎉
 
 ---
-deployment trigger
-## Folder Structure
+
+## ☁️ Deployment
+
+### Frontend → Vercel
+
+1. **Import** the repository on [vercel.com/new](https://vercel.com/new)
+2. **Set environment variables** in the Vercel dashboard:
+   - `GEMINI_API_KEY`
+   - `GOOGLE_API_KEY`
+   - `DATABASE_URL`
+   - `PYTHON_API_URL` — set to your deployed Python backend URL (e.g., `https://narrativa-api.onrender.com`)
+   - `BLOB_READ_WRITE_TOKEN` — create a Vercel Blob store and paste the token
+3. **Deploy** — Vercel auto-detects Next.js and runs `prisma generate && prisma db push && next build`
+
+### Python Backend → Render
+
+1. **Create a new Web Service** at [render.com](https://render.com)
+2. **Connect your repo** and set the **Root Directory** to `python_backend`
+3. **Build Command**: `pip install -r requirements.txt`
+4. **Start Command**: `uvicorn app:app --host 0.0.0.0 --port $PORT` (or use the included `Procfile`)
+5. **Set environment variables**:
+   - `GOOGLE_API_KEY` — your Gemini API key
+   - `FRONTEND_URL` — your Vercel deployment URL (for CORS, e.g., `https://narrativa.vercel.app`)
+
+---
+
+## 📦 Vector Store & Data Handling
+
+| Concern | How It Works |
+|---------|-------------|
+| **Document chunks** | Stored persistently in PostgreSQL via Prisma (`DocumentChunk` table) |
+| **Embeddings** | Generated by Gemini Embedding API (3072-dim vectors) |
+| **FAISS index** | In-memory + cached to `.data/` dir locally. On Vercel (read-only FS), the index is **ephemeral** — it rebuilds from scratch on each serverless cold start |
+| **Audio files** | Stored in `.audio/` locally, Vercel Blob in production |
+| **Slide bundles** | Generated as ZIP files by the Python backend, stored in Vercel Blob in production |
+
+> **Note:** The `.data/` and `.audio/` directories are runtime artifacts and are gitignored. They are created automatically when the app runs locally.
+
+---
+
+## 📁 Folder Structure
 
 ```
-Narrativa/
+Neurals/
 ├── src/
-│   ├── app/                 # Next.js App Router (Landing, API routes, Notebook workspace)
-│   ├── lib/                 # Shared utilities (store.ts, vector-store.ts, web-search.ts)
-│   └── components/          # Reusable UI components
-├── prisma/                  # Prisma schema definition
-├── scripts/                 # Legacy utilities
-├── python_backend/          # Standalone FastAPI service (for deployment on Render/Railway)
-├── .audio/                  # Generated MP3 assets (local development fallback)
-└── .data/                   # Vector embeddings and raw PDF uploads (local development fallback)
+│   ├── app/                    # Next.js App Router
+│   │   ├── page.tsx            # Animated landing page
+│   │   ├── notebook/[id]/      # 3-panel research workspace
+│   │   ├── deck/[id]/          # Reveal.js slide viewer
+│   │   └── api/                # Route Handlers (chat, upload, generate-*)
+│   └── lib/                    # Shared utilities
+│       ├── db.ts               # Prisma client singleton
+│       ├── store.ts            # Session, source, chunk CRUD operations
+│       ├── vector-store.ts     # FAISS index management
+│       ├── embeddings.ts       # Gemini embedding helpers
+│       ├── retrieval.ts        # RAG retrieval pipeline
+│       ├── web-search.ts       # Web scraping for Topic-to-Slides
+│       └── generate-text-slides.ts  # Text-based slide generation
+├── prisma/
+│   └── schema.prisma           # Database schema (Session, Source, Chunk, Artifact, Report)
+├── python_backend/             # Standalone FastAPI service
+│   ├── app.py                  # FastAPI endpoints (slides, audio)
+│   ├── agent.py                # LangGraph React agent (PDF → Slides)
+│   ├── tools.py                # Agent tools (analyze PDF, plan slides, etc.)
+│   ├── config.py               # Gemini model configuration
+│   ├── tts.py                  # edge-tts wrapper
+│   ├── requirements.txt        # Python dependencies
+│   └── Procfile                # Render/Railway start command
+├── scripts/
+│   └── youtube_transcript.py   # YouTube transcript fetcher
+├── .env.example                # Environment variable template
+├── package.json                # Node.js dependencies & scripts
+├── next.config.ts              # Next.js config (FAISS external package)
+├── prisma.config.ts            # Prisma datasource config
+└── tsconfig.json               # TypeScript config
 ```
 
-## Contributing
+---
+
+## 🤝 Contributing
+
 Contributions and feature requests are welcome! Create a branch and submit a PR for review.
+
+## 📄 License
+
+This project is proprietary. All rights reserved.
