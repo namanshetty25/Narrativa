@@ -11,68 +11,89 @@ Narrativa is a full-stack web application that acts as your personalized AI rese
 
 ## ✨ Features
 
-- **3-Panel Workspace** — Animated landing page + dedicated research notebook with sources panel, chat, and studio tools
-- **Source Management** — Upload PDFs, paste YouTube URLs, or link to web pages to build a per-session knowledge base
-- **Chat with Citations** — Ask questions against your sources; the AI responds with precise, inline citations (e.g., `[Source-1]`)
+- **3-Panel Workspace:** Animated landing page + dedicated research notebook with sources panel, chat, and studio tools.
+- **Source Management:** Upload PDFs, paste YouTube URLs, or link to web pages to build a per-session knowledge base.
+- **Chat with Citations:** Ask questions against your sources; the AI responds with precise, inline citations (e.g., `[Source-1]`).
 - **5 Studio Tools:**
   | Tool | Description |
   |------|-------------|
-  | 🎧 Audio Overview | Generates a conversational podcast explaining your sources via TTS |
-  | 📊 Executive Summary | Creates a structured one-page overview with key findings |
-  | 🎨 Slides Generator | Converts PDFs into beautiful Reveal.js presentation slides |
-  | 📽️ Topic to Slides | Researches any web topic and creates data-driven presentations |
-  | 📚 Research Report | Writes a comprehensive academic report with references |
+  | 🎧 Audio Overview | Generates a conversational podcast explaining your sources via TTS. |
+  | 📊 Executive Summary | Creates a structured one-page overview with key findings. |
+  | 🎨 Slides Generator | Converts PDFs into beautiful Reveal.js presentation slides using a LangGraph workflow. |
+  | 📽️ Topic to Slides | Researches any web topic and creates data-driven presentations. |
+  | 📚 Research Report | Writes a comprehensive academic report with references. |
 
 ---
 
 ## 🏗️ Architecture
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         Vercel (Frontend)                        │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │  Next.js   │  │  API Routes  │  │  FAISS Vector Store    │   │
-│  │  React UI  │──│  (Route      │──│  (in-memory, ephemeral │   │
-│  │  App Router│  │   Handlers)  │  │   per cold start)      │   │
-│  └────────────┘  └──────┬───────┘  └────────────────────────┘   │
-│                         │                                        │
-│              ┌──────────┴──────────┐                             │
-│              │  Prisma ORM         │                             │
-│              │  (Sessions, Sources,│                             │
-│              │   Chunks, Artifacts)│                             │
-│              └──────────┬──────────┘                             │
-└─────────────────────────┼────────────────────────────────────────┘
-                          │
-              ┌───────────┴───────────┐
-              │   Neon PostgreSQL     │
-              │   (Persistent DB)     │
-              └───────────────────────┘
+The system is distributed across a Next.js frontend application and a Python FastAPI backend, integrated with a PostgreSQL database and Google's Gemini LLMs.
 
-┌──────────────────────────────────────────────────────────────────┐
-│                    Render / Railway (Python Backend)              │
-│  ┌────────────┐  ┌──────────────┐  ┌────────────────────────┐   │
-│  │  FastAPI    │  │  LangGraph   │  │  edge-tts              │   │
-│  │  Endpoints  │──│  Agent       │──│  Text-to-Speech        │   │
-│  │  /api/*     │  │  (PDF→Slides)│  │  Audio Generation      │   │
-│  └────────────┘  └──────────────┘  └────────────────────────┘   │
-└──────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    Client((User / Browser))
+
+    subgraph Frontend["Next.js App Router (Frontend)"]
+        UI["React UI\n(Server & Client Components)"]
+        API["Next.js Route Handlers\n(/api/*)"]
+        VectorStore["FAISS Vector Store\n(In-memory caching via .data/)"]
+    end
+
+    subgraph DB["Database & Storage"]
+        Prisma["Prisma ORM"]
+        Neon[("Neon PostgreSQL\n(Sessions, Sources, Chunks)")]
+        LocalStore["Local File Storage\n(.audio/, Vercel Blob)"]
+    end
+
+    subgraph Backend["Python Service (FastAPI)"]
+        FastAPIEP["FastAPI Endpoints\n(Port 8000)"]
+        Agent["LangGraph Agent\n(PDF → Slides pipeline)"]
+        TTS["edge-tts\n(Audio Generation)"]
+    end
+
+    subgraph AI["External Services"]
+        GeminiFlash["Gemini 2.5 Flash / Pro\n(@google/genai)"]
+        Embedding["Gemini Embeddings\n(3072-dim vectors)"]
+    end
+
+    Client <--> UI
+    UI <--> API
+    
+    API <--> VectorStore
+    API <--> Prisma
+    Prisma <--> Neon
+    API <--> LocalStore
+    
+    API -- "HTTP Requests (Slides & Audio)" --> FastAPIEP
+    FastAPIEP <--> Agent
+    Agent <--> TTS
+    FastAPIEP <--> LocalStore
+    
+    API <--> GeminiFlash
+    API <--> Embedding
+    Agent <--> GeminiFlash
 ```
 
 ---
 
-## 🔧 Tech Stack
+## ⚙️ Technical Overview
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 16 (App Router), React 19, CSS Modules, Lucide Icons |
-| **Backend API** | Next.js Route Handlers |
-| **Database** | Prisma ORM → Neon PostgreSQL |
-| **AI** | Google Gemini 2.5 Flash / Pro via `@google/genai` |
-| **Vector Search** | Pure-JS in-memory cosine similarity search for RAG retrieval |
-| **Embeddings** | Gemini Embedding API (3072-dim) |
-| **Python Service** | FastAPI, LangGraph Agent, PyMuPDF, edge-tts |
-| **File Storage** | Vercel Blob (production) / local `.audio/` + `.data/` (dev) |
-| **Slides Engine** | Reveal.js |
+Narrativa leverages a sophisticated architecture combining modern web frameworks, LLM integrations, and Retrieval-Augmented Generation (RAG).
+
+### 1. Retrieval-Augmented Generation (RAG) Pipeline
+- **Ingestion & Chunking:** Uploaded documents (PDFs, Web Pages, YouTube Transcripts) are parsed and divided into semantically meaningful chunks.
+- **Embeddings:** Each chunk is converted into a 3072-dimensional embedding using Google's Gemini Embedding API.
+- **Vector Search (FAISS):** A pure-JS implementation of FAISS runs in-memory. Embeddings are cached to a local `.data/` directory for fast consecutive retrievals. On cold starts in serverless environments, the vector index is dynamically rebuilt from chunks stored persistently in PostgreSQL.
+- **Synthesis:** For chat and tool compilation, retrieved chunks are injected as context to Gemini 2.5 models to generate grounded responses, with strong system prompts enforcing strict citation formatting.
+
+### 2. Multi-Agent Python Backend (LangGraph)
+Complex document processing is offloaded to a standalone Python backend to bypass serverless execution time limits and leverage native Python data science libraries:
+- **Slide Generation Workflow:** A state-graph approach via **LangGraph**. The system utilizes iterative planning: an agent parses PDF content using `PyMuPDF`, formulates an outline, generates specific slide content (injecting relevant charts and data), and compiles the output into a Reveal.js bundle.
+- **Audio Generation:** Text-to-Speech synthesis is achieved using `edge-tts`. The generated audio artifacts are served statically or pushed to blob storage.
+
+### 3. Data Persistence Layer
+- **SQL Database:** Uses **Prisma ORM** over a **Neon PostgreSQL** database. The schema cleanly separates `Session` (a workspace instance), `Source` (raw documents/links), `DocumentChunk` (text pieces for vector search), and `Artifact` (generated outputs like slides, audios, and reports).
+- **File Storage:** Locally, the application saves artifacts to `.audio/` and `.data/`. In a production deployment, this maps to Vercel Blob or similar remote object storage.
 
 ---
 
@@ -148,25 +169,9 @@ Open [http://localhost:3000](http://localhost:3000) 🎉
 
 ---
 
-
-
-## 📦 Vector Store & Data Handling
-
-| Concern | How It Works |
-|---------|-------------|
-| **Document chunks** | Stored persistently in PostgreSQL via Prisma (`DocumentChunk` table) |
-| **Embeddings** | Generated by Gemini Embedding API (3072-dim vectors) |
-| **Vector index** | In-memory pure-JS store cached to `.data/` dir locally. On serverless environments, the index rebuilds from PostgreSQL on each cold start |
-| **Audio files** | Stored in `.audio/` locally, Vercel Blob in production |
-| **Slide bundles** | Generated as ZIP files by the Python backend, stored in Vercel Blob in production |
-
-> **Note:** The `.data/` and `.audio/` directories are runtime artifacts and are gitignored. They are created automatically when the app runs locally.
-
----
-
 ## 📁 Folder Structure
 
-```
+```text
 Neurals/
 ├── src/
 │   ├── app/                    # Next.js App Router
@@ -196,7 +201,7 @@ Neurals/
 │   └── youtube_transcript.py   # YouTube transcript fetcher
 ├── .env.example                # Environment variable template
 ├── package.json                # Node.js dependencies & scripts
-├── next.config.ts              # Next.js config (FAISS external package)
+├── next.config.ts              # Next.js config
 ├── prisma.config.ts            # Prisma datasource config
 └── tsconfig.json               # TypeScript config
 ```
