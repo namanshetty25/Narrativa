@@ -1,5 +1,7 @@
 # Narrativa — AI-Powered Research Notebook
 
+[![Watch Demo](https://img.youtube.com/vi/v3lkLRfNYYA/0.jpg)](https://youtu.be/v3lkLRfNYYA)
+
 Narrativa is a full-stack web application that acts as your personalized AI research assistant (inspired by Google NotebookLM). Upload documents, paste web links, or add YouTube videos as sources — then let the AI generate audio podcasts, executive summaries, presentation slides, and deep-dive research reports from your knowledge base.
 
 ![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)
